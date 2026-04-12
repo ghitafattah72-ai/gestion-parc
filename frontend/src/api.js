@@ -58,6 +58,7 @@ export const locauxITAPI = {
   update: (id, data) => api.put(`/locaux-it/${id}`, data),
   delete: (id) => api.delete(`/locaux-it/${id}`),
   initDefault: () => api.post('/locaux-it/default/init'),
+  initDefaultBaies: () => api.post('/locaux-it/default/init-baies'),
   
   // Baies
   getBaies: (localId) => api.get(`/locaux-it/${localId}/baies`),

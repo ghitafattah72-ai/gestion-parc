@@ -7,6 +7,8 @@ import pandas as pd
 from openpyxl import Workbook
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import Utilisateur
+from decorators import check_permission
+from export_utils import export_to_csv, export_to_excel, get_export_filename
 
 parc_bp = Blueprint('parc', __name__, url_prefix='/api/parc')
 
@@ -123,18 +125,8 @@ def delete_parc_item(id):
 
 # IMPORT parc from Excel/CSV
 @parc_bp.route('/import', methods=['POST'])
-@jwt_required()
+@check_permission('import')
 def import_parc():
-    current_user_id = get_jwt_identity()
-    current_user = Utilisateur.query.get(current_user_id)
-    
-    if not current_user:
-        return jsonify({'message': 'Utilisateur non trouvé'}), 404
-    
-    # Check import permission
-    if not current_user.permission_import:
-        return jsonify({'message': 'Vous n\'avez pas la permission d\'importer des données'}), 403
-    
     try:
         if 'file' not in request.files:
             return jsonify({'error': 'No file provided'}), 400

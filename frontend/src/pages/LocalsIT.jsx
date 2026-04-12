@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { locauxITAPI, mouvementsAPI } from '../api';
-import { Plus, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Building2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { RestrictedButton } from '../components/ProtectedRoute';
 
 export default function LocalsIT() {
+  const { hasPermission } = useAuth();
   const [locaux, setLocaux] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [expandedLocal, setExpandedLocal] = useState(null);
   const [showLocalForm, setShowLocalForm] = useState(false);
   const [showBaieForm, setShowBaieForm] = useState(null);
-  const [showMouvementForm, setShowMouvementForm] = useState(null);
+  const [showEquipForm, setShowEquipForm] = useState(null);
 
   const [localForm, setLocalForm] = useState({
     nom: '',
@@ -23,7 +24,7 @@ export default function LocalsIT() {
     description: '',
   });
 
-  const [mouvementForm, setMouvementForm] = useState({
+  const [equipForm, setEquipForm] = useState({
     nom_equipement: '',
     type_equipement: '',
     quantite: 0,
@@ -42,6 +43,7 @@ export default function LocalsIT() {
       setLocaux(res.data);
     } catch (error) {
       console.error('Erreur:', error);
+      alert('Erreur lors du chargement');
     } finally {
       setLoading(false);
     }
@@ -51,13 +53,25 @@ export default function LocalsIT() {
     e.preventDefault();
     try {
       await locauxITAPI.create(localForm);
-      alert('Local IT ajouté');
+      alert('✓ Local IT ajouté');
       setLocalForm({ nom: '', description: '', localisation: '' });
       setShowLocalForm(false);
       loadLocaux();
     } catch (error) {
       console.error('Erreur:', error);
-      alert('Erreur lors de l\'ajout');
+      alert('✗ Erreur lors de l\'ajout');
+    }
+  };
+
+  const handleDeleteLocal = async (id) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce local?')) return;
+    try {
+      await locauxITAPI.delete(id);
+      alert('✓ Local IT supprimé');
+      loadLocaux();
+    } catch (error) {
+      console.error('Erreur:', error);
+      alert('✗ Erreur lors de la suppression');
     }
   };
 
@@ -65,93 +79,112 @@ export default function LocalsIT() {
     e.preventDefault();
     try {
       await locauxITAPI.createBaie(localId, baieForm);
-      alert('Baie ajoutée');
+      alert('✓ Baie ajoutée');
       setBaieForm({ nom: '', numero: '', description: '' });
       setShowBaieForm(null);
       loadLocaux();
     } catch (error) {
       console.error('Erreur:', error);
-      alert('Erreur lors de l\'ajout de la baie');
+      alert('✗ Erreur lors de l\'ajout');
     }
   };
 
   const handleDeleteBaie = async (id) => {
-    if (!window.confirm('Supprimer cette baie?')) return;
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette baie?')) return;
     try {
       await locauxITAPI.deleteBaie(id);
-      alert('Baie supprimée');
+      alert('✓ Baie supprimée');
       loadLocaux();
     } catch (error) {
       console.error('Erreur:', error);
-      alert('Erreur lors de la suppression');
+      alert('✗ Erreur lors de la suppression');
     }
   };
 
   const handleAddEquipement = async (e, localId) => {
     e.preventDefault();
     try {
+      const localName = locaux.find(l => l.id === localId)?.nom;
       await mouvementsAPI.create({
-        ...mouvementForm,
-        local_it_destination: locaux.find(l => l.id === localId)?.nom,
-        type_mouvement: 'transfert',
+        ...equipForm,
+        local_it_destination: localName,
+        type_mouvement: 'Entrée',
       });
-      alert('Équipement transféré vers le local IT');
-      setMouvementForm({ nom_equipement: '', type_equipement: '', quantite: 0, type_stock: '', baie_destination: '' });
-      setShowMouvementForm(null);
+      alert('✓ Équipement ajouté au local IT');
+      setEquipForm({ nom_equipement: '', type_equipement: '', quantite: 0, type_stock: '', baie_destination: '' });
+      setShowEquipForm(null);
       loadLocaux();
     } catch (error) {
       console.error('Erreur:', error);
-      alert('Erreur lors du transfert');
+      alert('✗ Erreur lors de l\'ajout');
     }
   };
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Gestion des Locaux IT</h2>
-        <RestrictedButton
-          onClick={() => setShowLocalForm(!showLocalForm)}
-          requiredAction="edit"
-          className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
-        >
-          <Plus size={18} /> Ajouter Local IT
-        </RestrictedButton>
+    <div className="space-y-6">
+      {/* Header avec gradient */}
+      <div className="rounded-[28px] bg-gradient-to-r from-slate-900 to-slate-700 p-6 text-white shadow-lg">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-3xl font-bold flex items-center gap-2">
+              <Building2 size={32} />
+              Gestion des Locaux IT
+            </h2>
+            <p className="mt-2 text-slate-200 max-w-2xl">Gérez vos locaux IT, baies techniques et équipements avec un contrôle d'accès granulaire.</p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <RestrictedButton
+              onClick={() => setShowLocalForm(!showLocalForm)}
+              requiredAction="edit"
+              className="flex items-center gap-2 rounded-full bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-600"
+            >
+              <Plus size={18} /> Ajouter un local
+            </RestrictedButton>
+            <RestrictedButton
+              onClick={() => setShowBaieForm('new')}
+              requiredAction="edit"
+              className="flex items-center gap-2 rounded-full bg-green-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-600"
+            >
+              <Plus size={18} /> Ajouter une baie
+            </RestrictedButton>
+          </div>
+        </div>
       </div>
 
       {/* Add Local Form */}
       {showLocalForm && (
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="rounded-[20px] bg-white p-6 shadow-lg border-l-4 border-sky-500">
           <h3 className="text-xl font-bold mb-4">Ajouter un Local IT</h3>
           <form onSubmit={handleAddLocal} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <input
                 type="text"
-                placeholder="Nom du local"
+                placeholder="Nom du local (ex: CIM2)"
                 value={localForm.nom}
                 onChange={(e) => setLocalForm({ ...localForm, nom: e.target.value })}
-                className="p-2 border rounded"
+                className="p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
                 required
               />
               <input
                 type="text"
-                placeholder="Localisation"
+                placeholder="Localisation (ex: Bâtiment A, Étage 3)"
                 value={localForm.localisation}
                 onChange={(e) => setLocalForm({ ...localForm, localisation: e.target.value })}
-                className="p-2 border rounded"
+                className="p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
               />
             </div>
             <textarea
               placeholder="Description"
               value={localForm.description}
               onChange={(e) => setLocalForm({ ...localForm, description: e.target.value })}
-              className="w-full p-2 border rounded"
+              className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
               rows="2"
             />
             <div className="flex gap-2 justify-end">
-              <button type="button" onClick={() => setShowLocalForm(false)} className="px-4 py-2 bg-gray-300 rounded">
+              <button type="button" onClick={() => setShowLocalForm(false)} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-lg font-medium">
                 Annuler
               </button>
-              <button type="submit" className="px-4 py-2 bg-blue-500 text-white rounded">
+              <button type="submit" className="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg font-medium">
                 Ajouter
               </button>
             </div>
@@ -159,180 +192,215 @@ export default function LocalsIT() {
         </div>
       )}
 
-      {/* Locaux IT List */}
-      <div className="space-y-4">
-        {loading ? (
-          <div className="text-center p-4">Chargement...</div>
-        ) : locaux.length === 0 ? (
-          <div className="text-center p-4">Aucun local IT</div>
-        ) : (
-          locaux.map(local => (
-            <div key={local.id} className="bg-white rounded-lg shadow">
-              <div className="p-4 cursor-pointer hover:bg-gray-50 flex justify-between items-center" onClick={() => setExpandedLocal(expandedLocal === local.id ? null : local.id)}>
-                <div>
-                  <h3 className="text-lg font-bold">{local.nom}</h3>
-                  <p className="text-gray-600">{local.description}</p>
+      {/* Main Content - 2 Columns */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Locaux IT - Left Column */}
+        <div className="rounded-[20px] bg-white p-6 shadow-lg border-t-4 border-sky-500">
+          <h3 className="text-xl font-bold mb-4">Locaux IT</h3>
+          {loading ? (
+            <div className="text-center p-8 text-slate-500">Chargement...</div>
+          ) : locaux.length === 0 ? (
+            <div className="text-center p-8 text-slate-500">Aucun local IT</div>
+          ) : (
+            <div className="space-y-2">
+              {locaux.map(local => (
+                <div key={local.id} className="flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition cursor-pointer group">
+                  <div className="flex-1">
+                    <p className="font-semibold text-slate-900">{local.nom}</p>
+                    <p className="text-xs text-slate-500">{local.localisation}</p>
+                  </div>
+                  <RestrictedButton
+                    onClick={() => handleDeleteLocal(local.id)}
+                    requiredAction="edit"
+                    className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition ml-2"
+                  >
+                    <Trash2 size={18} />
+                  </RestrictedButton>
                 </div>
-                <div className="flex items-center gap-2">
-                  {expandedLocal === local.id ? <ChevronUp /> : <ChevronDown />}
-                </div>
-              </div>
+              ))}
+            </div>
+          )}
+        </div>
 
-              {expandedLocal === local.id && (
-                <div className="border-t p-4 space-y-4">
-                  <div className="flex justify-between items-center border-b pb-4">
-                    <div>
-                      <h4 className="font-bold">Baies IT</h4>
-                      <p className="text-xs text-gray-500">Configuration selon cahier des charges + possibilité d'ajout</p>
+        {/* Baies Techniques - Right Column */}
+        <div className="rounded-[20px] bg-white p-6 shadow-lg border-t-4 border-green-500">
+          <h3 className="text-xl font-bold mb-4">Baies techniques</h3>
+          {loading ? (
+            <div className="text-center p-8 text-slate-500">Chargement...</div>
+          ) : locaux.length === 0 ? (
+            <div className="text-center p-8 text-slate-500">Aucune baie</div>
+          ) : (
+            <div className="space-y-3">
+              {locaux.flatMap(local =>
+                local.baies && local.baies.length > 0 ? (
+                  local.baies.map(baie => (
+                    <div key={baie.id} className="flex items-center justify-between p-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition">
+                      <div className="flex-1">
+                        <p className="font-semibold text-slate-900">{baie.nom}</p>
+                        <p className="text-xs text-slate-500">{local.nom}</p>
+                      </div>
+                      <RestrictedButton
+                        onClick={() => handleDeleteBaie(baie.id)}
+                        requiredAction="edit"
+                        className="text-red-500 hover:text-red-700 transition ml-2"
+                      >
+                        <Trash2 size={18} />
+                      </RestrictedButton>
                     </div>
-                    <RestrictedButton
-                      onClick={() => setShowBaieForm(showBaieForm === local.id ? null : local.id)}
-                      requiredAction="edit"
-                      className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm"
-                    >
-                      <Plus size={16} /> Ajouter Baie
-                    </RestrictedButton>
-                  </div>
-
-                  {showBaieForm === local.id && (
-                    <form onSubmit={(e) => handleAddBaie(e, local.id)} className="bg-gray-50 p-4 rounded space-y-2">
-                      <input
-                        type="text"
-                        placeholder="Nom de la baie"
-                        value={baieForm.nom}
-                        onChange={(e) => setBaieForm({ ...baieForm, nom: e.target.value })}
-                        className="w-full p-2 border rounded"
-                        required
-                      />
-                      <input
-                        type="number"
-                        placeholder="Numéro"
-                        value={baieForm.numero}
-                        onChange={(e) => setBaieForm({ ...baieForm, numero: e.target.value })}
-                        className="w-full p-2 border rounded"
-                      />
-                      <textarea
-                        placeholder="Description"
-                        value={baieForm.description}
-                        onChange={(e) => setBaieForm({ ...baieForm, description: e.target.value })}
-                        className="w-full p-2 border rounded"
-                        rows="2"
-                      />
-                      <div className="flex gap-2 justify-end">
-                        <button type="button" onClick={() => setShowBaieForm(null)} className="px-3 py-1 bg-gray-300 rounded text-sm">
-                          Annuler
-                        </button>
-                        <button type="submit" className="px-3 py-1 bg-green-500 text-white rounded text-sm">
-                          Ajouter
-                        </button>
-                      </div>
-                    </form>
-                  )}
-
-                  {/* Baies List */}
-                  <div className="space-y-2">
-                    {local.baies && local.baies.length > 0 ? (
-                      local.baies.map(baie => (
-                        <div key={baie.id} className="bg-gray-100 p-3 rounded flex justify-between items-center">
-                          <div>
-                            <p className="font-semibold">{baie.nom}</p>
-                            <p className="text-sm text-gray-600">{baie.description}</p>
-                          </div>
-                          <RestrictedButton
-                            onClick={() => handleDeleteBaie(baie.id)}
-                            requiredAction="edit"
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <Trash2 size={18} />
-                          </RestrictedButton>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-gray-500">Aucune baie</p>
-                    )}
-                  </div>
-
-                  <div className="border-t pt-4 flex justify-between items-center">
-                    <h4 className="font-bold">Ajouter Équipement</h4>
-                    <RestrictedButton
-                      onClick={() => setShowMouvementForm(showMouvementForm === local.id ? null : local.id)}
-                      requiredAction="edit"
-                      className="flex items-center gap-2 bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded text-sm"
-                    >
-                      <Plus size={16} /> Équipement
-                    </RestrictedButton>
-                  </div>
-
-                  {showMouvementForm === local.id && (
-                    <form onSubmit={(e) => handleAddEquipement(e, local.id)} className="bg-gray-50 p-4 rounded space-y-2">
-                      <input
-                        type="text"
-                        placeholder="Nom équipement"
-                        value={mouvementForm.nom_equipement}
-                        onChange={(e) => setMouvementForm({ ...mouvementForm, nom_equipement: e.target.value })}
-                        className="w-full p-2 border rounded"
-                        required
-                      />
-                      <select
-                        value={mouvementForm.type_equipement}
-                        onChange={(e) => setMouvementForm({ ...mouvementForm, type_equipement: e.target.value })}
-                        className="w-full p-2 border rounded"
-                        required
-                      >
-                        <option value="">Type</option>
-                        <option>pc portable</option>
-                        <option>pc fixe</option>
-                        <option>imprimante</option>
-                        <option>écran</option>
-                        <option>câble</option>
-                        <option>autre</option>
-                      </select>
-                      <input
-                        type="number"
-                        placeholder="Quantité"
-                        value={mouvementForm.quantite}
-                        onChange={(e) => setMouvementForm({ ...mouvementForm, quantite: parseInt(e.target.value) })}
-                        className="w-full p-2 border rounded"
-                        required
-                      />
-                      <select
-                        value={mouvementForm.type_stock}
-                        onChange={(e) => setMouvementForm({ ...mouvementForm, type_stock: e.target.value })}
-                        className="w-full p-2 border rounded"
-                        required
-                      >
-                        <option value="">Type Stock</option>
-                        <option>FSS</option>
-                        <option>IMS</option>
-                        <option>C2S</option>
-                        <option>Commun</option>
-                      </select>
-                      <select
-                        value={mouvementForm.baie_destination}
-                        onChange={(e) => setMouvementForm({ ...mouvementForm, baie_destination: e.target.value })}
-                        className="w-full p-2 border rounded"
-                      >
-                        <option value="">Sélectionner Baie (optionnel)</option>
-                        {local.baies && local.baies.map(baie => (
-                          <option key={baie.id} value={baie.nom}>{baie.nom}</option>
-                        ))}
-                      </select>
-                      <div className="flex gap-2 justify-end">
-                        <button type="button" onClick={() => setShowMouvementForm(null)} className="px-3 py-1 bg-gray-300 rounded text-sm">
-                          Annuler
-                        </button>
-                        <button type="submit" className="px-3 py-1 bg-purple-500 text-white rounded text-sm">
-                          Transférer
-                        </button>
-                      </div>
-                    </form>
-                  )}
-                </div>
+                  ))
+                ) : null
+              )}
+              {locaux.every(l => !l.baies || l.baies.length === 0) && (
+                <div className="text-center p-8 text-slate-500">Aucune baie</div>
               )}
             </div>
-          ))
-        )}
+          )}
+        </div>
       </div>
+
+      {/* Add Baie Form */}
+      {showBaieForm && (
+        <div className="rounded-[20px] bg-white p-6 shadow-lg border-l-4 border-green-500">
+          <h3 className="text-xl font-bold mb-4">Ajouter une Baie Technique</h3>
+          <form onSubmit={(e) => {
+            const localId = locaux[0]?.id;
+            if (localId) handleAddBaie(e, localId);
+            else alert('Créez d\'abord un local IT');
+          }} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Sélectionner le local</label>
+              <select onChange={(e) => {}} className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 outline-none" required>
+                <option value="">-- Sélectionnez un local --</option>
+                {locaux.map(local => (
+                  <option key={local.id} value={local.id}>{local.nom}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                type="text"
+                placeholder="Nom de la baie (ex: Baie 1)"
+                value={baieForm.nom}
+                onChange={(e) => setBaieForm({ ...baieForm, nom: e.target.value })}
+                className="p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+                required
+              />
+              <input
+                type="text"
+                placeholder="Numéro"
+                value={baieForm.numero}
+                onChange={(e) => setBaieForm({ ...baieForm, numero: e.target.value })}
+                className="p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+              />
+            </div>
+            <textarea
+              placeholder="Description"
+              value={baieForm.description}
+              onChange={(e) => setBaieForm({ ...baieForm, description: e.target.value })}
+              className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+              rows="2"
+            />
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => setShowBaieForm(null)} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-lg font-medium">
+                Annuler
+              </button>
+              <button type="submit" className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium">
+                Ajouter
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Add Equipement Section */}
+      {showEquipForm && (
+        <div className="rounded-[20px] bg-white p-6 shadow-lg border-l-4 border-purple-500">
+          <h3 className="text-xl font-bold mb-4">Ajouter Équipement à un Local IT</h3>
+          <form onSubmit={(e) => {
+            const localId = locaux[0]?.id;
+            if (localId) handleAddEquipement(e, localId);
+            else alert('Créez d\'abord un local IT');
+          }} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Sélectionner le local</label>
+              <select onChange={(e) => {}} className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" required>
+                <option value="">-- Sélectionnez un local --</option>
+                {locaux.map(local => (
+                  <option key={local.id} value={local.id}>{local.nom}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                type="text"
+                placeholder="Nom équipement"
+                value={equipForm.nom_equipement}
+                onChange={(e) => setEquipForm({ ...equipForm, nom_equipement: e.target.value })}
+                className="p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                required
+              />
+              <select
+                value={equipForm.type_equipement}
+                onChange={(e) => setEquipForm({ ...equipForm, type_equipement: e.target.value })}
+                className="p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                required
+              >
+                <option value="">Type équipement</option>
+                <option>pc portable</option>
+                <option>pc fixe</option>
+                <option>imprimante</option>
+                <option>écran</option>
+                <option>câble</option>
+                <option>autre</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                type="number"
+                placeholder="Quantité"
+                value={equipForm.quantite}
+                onChange={(e) => setEquipForm({ ...equipForm, quantite: parseInt(e.target.value) || 0 })}
+                className="p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                min="1"
+                required
+              />
+              <select
+                value={equipForm.type_stock}
+                onChange={(e) => setEquipForm({ ...equipForm, type_stock: e.target.value })}
+                className="p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                required
+              >
+                <option value="">Type Stock</option>
+                <option>FSS</option>
+                <option>IMS</option>
+                <option>C2S</option>
+                <option>Commun</option>
+              </select>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => setShowEquipForm(null)} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-lg font-medium">
+                Annuler
+              </button>
+              <button type="submit" className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-medium">
+                Ajouter
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Bouton Ajouter Equipement */}
+      {!showEquipForm && (
+        <div className="text-center">
+          <RestrictedButton
+            onClick={() => setShowEquipForm(!showEquipForm)}
+            requiredAction="edit"
+            className="flex items-center gap-2 mx-auto rounded-full bg-purple-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-purple-600"
+          >
+            <Plus size={18} /> Ajouter Équipement
+          </RestrictedButton>
+        </div>
+      )}
     </div>
   );
 }

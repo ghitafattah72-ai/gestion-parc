@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { mouvementsAPI, locauxITAPI } from '../api';
 import { Plus, Trash2, Download, Search } from 'lucide-react';
 import { RestrictedButton } from '../components/ProtectedRoute';
+import { handleExportFile } from '../utils/fileExport';
+import { EQUIPMENT_TYPES_WITH_DETAILS, MOVEMENT_TYPES } from '../constants';
 
 const equipmentTypes = [
   'pc portable', 'pc fixe', 'imprimante', 'étiquette', 'imprimante A4',
@@ -128,17 +130,13 @@ export default function Mouvements() {
 
   const handleExport = async (format) => {
     try {
-      const res = await mouvementsAPI.export(format);
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `mouvements.${format === 'xlsx' ? 'xlsx' : 'csv'}`);
-      document.body.appendChild(link);
-      link.click();
-      link.parentElement.removeChild(link);
+      await handleExportFile(
+        (fmt) => mouvementsAPI.export(fmt),
+        format,
+        'mouvements'
+      );
     } catch (error) {
-      console.error('Erreur:', error);
-      alert('Erreur lors de l\'export');
+      alert(error.message);
     }
   };
 

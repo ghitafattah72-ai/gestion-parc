@@ -3,6 +3,7 @@ import { parcAPI, locauxITAPI } from '../api';
 import { Plus, Edit2, Trash2, Download, Upload, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { RestrictedButton } from '../components/ProtectedRoute';
+import { handleExportFile } from '../utils/fileExport';
 
 export default function Parc() {
   const { hasPermission } = useAuth();
@@ -134,17 +135,13 @@ export default function Parc() {
 
   const handleExport = async (format) => {
     try {
-      const res = await parcAPI.export(format);
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `parc.${format === 'xlsx' ? 'xlsx' : 'csv'}`);
-      document.body.appendChild(link);
-      link.click();
-      link.parentElement.removeChild(link);
+      await handleExportFile(
+        (fmt) => parcAPI.export(fmt),
+        format,
+        'parc'
+      );
     } catch (error) {
-      console.error('Erreur:', error);
-      alert('Erreur lors de l\'export');
+      alert(error.message);
     }
   };
 

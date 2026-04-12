@@ -6,6 +6,8 @@ import io
 from openpyxl import Workbook
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import Utilisateur
+from decorators import check_permission
+from export_utils import export_to_csv, export_to_excel, get_export_filename
 
 mouvements_bp = Blueprint('mouvements', __name__, url_prefix='/api/mouvements')
 
@@ -150,78 +152,33 @@ def get_stats():
 
 # EXPORT movements to CSV/Excel
 @mouvements_bp.route('/export', methods=['GET'])
-@jwt_required()
+@check_permission('export')
 def export_mouvements():
-    current_user_id = get_jwt_identity()
-    current_user = Utilisateur.query.get(current_user_id)
-    
-    if not current_user:
-        return jsonify({'message': 'Utilisateur non trouvé'}), 404
-    
-    # Check export permission
-    if not current_user.permission_export:
-        return jsonify({'message': 'Vous n\'avez pas la permission d\'exporter des données'}), 403
-    
     format_type = request.args.get('format', 'csv')
-    
     items = Mouvement.query.order_by(Mouvement.date_mouvement.desc()).all()
     
+    # Prepare headers
+    headers = ['ID', 'Type', 'Équipement', 'Type Équipement', 'Quantité', 'Type Stock',
+               'Local IT Destination', 'Baie Destination', 'RAM', 'Stockage', 'Processeur',
+               'N° Série', 'Activité', 'Système', 'Accessoires', 'Date']
+    
+    # Prepare data rows
+    rows = [[
+        item.id, item.type_mouvement, item.nom_equipement, item.type_equipement,
+        item.quantite, item.type_stock, item.local_it_destination or '',
+        item.baie_destination or '', item.ram or '', item.stockage or '',
+        item.processeur or '', item.numero_serie or '', item.activite or '',
+        item.systeme or '', item.accessoires or '', item.date_mouvement.isoformat()
+    ] for item in items]
+    
+    # Generate filename
+    filename = get_export_filename('mouvements', format_type)
+    
+    # Export to requested format
     if format_type == 'xlsx':
-        # Export to Excel
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "Mouvements"
-        
-        headers = ['ID', 'Type', 'Équipement', 'Type Équipement', 'Quantité', 'Type Stock',
-                   'Local IT Destination', 'Baie Destination', 'RAM', 'Stockage', 'Processeur',
-                   'N° Série', 'Activité', 'Système', 'Accessoires', 'Date']
-        ws.append(headers)
-        
-        for item in items:
-            ws.append([
-                item.id, item.type_mouvement, item.nom_equipement, item.type_equipement,
-                item.quantite, item.type_stock, item.local_it_destination or '',
-                item.baie_destination or '', item.ram or '', item.stockage or '',
-                item.processeur or '', item.numero_serie or '', item.activite or '',
-                item.systeme or '', item.accessoires or '', item.date_mouvement.isoformat()
-            ])
-        
-        output = io.BytesIO()
-        wb.save(output)
-        output.seek(0)
-        
-        from flask import send_file
-        return send_file(
-            output,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True,
-            download_name=f'mouvements_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
-        )
+        return export_to_excel(headers, rows, filename, sheet_name='Mouvements')
     else:
-        # Export to CSV
-        output = io.StringIO()
-        writer = csv.writer(output)
-        
-        writer.writerow(['ID', 'Type', 'Équipement', 'Type Équipement', 'Quantité', 'Type Stock',
-                        'Local IT Destination', 'Baie Destination', 'RAM', 'Stockage', 'Processeur',
-                        'N° Série', 'Activité', 'Système', 'Accessoires', 'Date'])
-        
-        for item in items:
-            writer.writerow([
-                item.id, item.type_mouvement, item.nom_equipement, item.type_equipement,
-                item.quantite, item.type_stock, item.local_it_destination or '',
-                item.baie_destination or '', item.ram or '', item.stockage or '',
-                item.processeur or '', item.numero_serie or '', item.activite or '',
-                item.systeme or '', item.accessoires or '', item.date_mouvement.isoformat()
-            ])
-        
-        from flask import send_file
-        return send_file(
-            io.BytesIO(output.getvalue().encode()),
-            mimetype='text/csv',
-            as_attachment=True,
-            download_name=f'mouvements_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
-        )
+        return export_to_csv(headers, rows, filename)
 
 def mouvement_to_dict(item):
     return {

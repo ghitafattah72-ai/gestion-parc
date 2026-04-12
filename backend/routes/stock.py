@@ -6,6 +6,8 @@ import io
 from openpyxl import Workbook
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import Utilisateur
+from decorators import check_permission
+from export_utils import export_to_csv, export_to_excel, get_export_filename
 
 stock_bp = Blueprint('stock', __name__, url_prefix='/api/stock')
 
@@ -112,18 +114,8 @@ def get_stats():
 
 # EXPORT stock to CSV/Excel
 @stock_bp.route('/export', methods=['GET'])
-@jwt_required()
+@check_permission('export')
 def export_stock():
-    current_user_id = get_jwt_identity()
-    current_user = Utilisateur.query.get(current_user_id)
-    
-    if not current_user:
-        return jsonify({'message': 'Utilisateur non trouvé'}), 404
-    
-    # Check export permission
-    if not current_user.permission_export:
-        return jsonify({'message': 'Vous n\'avez pas la permission d\'exporter des données'}), 403
-    
     format_type = request.args.get('format', 'csv')
     type_stock = request.args.get('type_stock', None)
     
@@ -133,61 +125,25 @@ def export_stock():
     
     items = query.all()
     
+    # Prepare headers and data rows
+    headers = ['ID', 'Nom', 'Type Équipement', 'Quantité', 'Type Stock', 'État', 
+               'RAM', 'Stockage', 'Processeur', 'N° Série', 'Activité', 'Système', 'Accessoires']
+    
+    rows = [[
+        item.id, item.nom_equipement, item.type_equipement, item.quantite,
+        item.type_stock, item.etat, item.ram or '', item.stockage or '',
+        item.processeur or '', item.numero_serie or '', item.activite or '',
+        item.systeme or '', item.accessoires or ''
+    ] for item in items]
+    
+    # Generate filename
+    filename = get_export_filename('stock', format_type)
+    
+    # Export to requested format
     if format_type == 'xlsx':
-        # Export to Excel
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "Stock"
-        
-        # Header
-        headers = ['ID', 'Nom', 'Type Équipement', 'Quantité', 'Type Stock', 'État', 
-                   'RAM', 'Stockage', 'Processeur', 'N° Série', 'Activité', 'Système', 'Accessoires']
-        ws.append(headers)
-        
-        # Data
-        for item in items:
-            ws.append([
-                item.id, item.nom_equipement, item.type_equipement, item.quantite,
-                item.type_stock, item.etat, item.ram or '', item.stockage or '',
-                item.processeur or '', item.numero_serie or '', item.activite or '',
-                item.systeme or '', item.accessoires or ''
-            ])
-        
-        # Save to bytes
-        output = io.BytesIO()
-        wb.save(output)
-        output.seek(0)
-        
-        from flask import send_file
-        return send_file(
-            output,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True,
-            download_name=f'stock_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
-        )
+        return export_to_excel(headers, rows, filename, sheet_name='Stock')
     else:
-        # Export to CSV
-        output = io.StringIO()
-        writer = csv.writer(output)
-        
-        writer.writerow(['ID', 'Nom', 'Type Équipement', 'Quantité', 'Type Stock', 'État',
-                        'RAM', 'Stockage', 'Processeur', 'N° Série', 'Activité', 'Système', 'Accessoires'])
-        
-        for item in items:
-            writer.writerow([
-                item.id, item.nom_equipement, item.type_equipement, item.quantite,
-                item.type_stock, item.etat, item.ram or '', item.stockage or '',
-                item.processeur or '', item.numero_serie or '', item.activite or '',
-                item.systeme or '', item.accessoires or ''
-            ])
-        
-        from flask import send_file
-        return send_file(
-            io.BytesIO(output.getvalue().encode()),
-            mimetype='text/csv',
-            as_attachment=True,
-            download_name=f'stock_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
-        )
+        return export_to_csv(headers, rows, filename)
 
 def item_to_dict(item):
     return {
