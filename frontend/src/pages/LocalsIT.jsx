@@ -32,6 +32,10 @@ export default function LocalsIT() {
     baie_destination: '',
   });
 
+  const [selectedLocalForBaie, setSelectedLocalForBaie] = useState('');
+  const [selectedLocalForEquip, setSelectedLocalForEquip] = useState('');
+  const [selectedBaieForEquip, setSelectedBaieForEquip] = useState('');
+
   useEffect(() => {
     loadLocaux();
   }, []);
@@ -41,6 +45,13 @@ export default function LocalsIT() {
       setLoading(true);
       const res = await locauxITAPI.getAll();
       setLocaux(res.data);
+      if (res.data.length > 0) {
+        const defaultLocalId = res.data[0].id;
+        setSelectedLocalForBaie((prev) => prev || defaultLocalId);
+        setSelectedLocalForEquip((prev) => prev || defaultLocalId);
+        const firstBaies = res.data[0].baies || [];
+        setSelectedBaieForEquip(firstBaies[0]?.nom || '');
+      }
     } catch (error) {
       console.error('Erreur:', error);
       alert('Erreur lors du chargement');
@@ -78,7 +89,8 @@ export default function LocalsIT() {
   const handleAddBaie = async (e, localId) => {
     e.preventDefault();
     try {
-      await locauxITAPI.createBaie(localId, baieForm);
+      const targetLocalId = localId || selectedLocalForBaie;
+      await locauxITAPI.createBaie(targetLocalId, baieForm);
       alert('✓ Baie ajoutée');
       setBaieForm({ nom: '', numero: '', description: '' });
       setShowBaieForm(null);
@@ -104,10 +116,12 @@ export default function LocalsIT() {
   const handleAddEquipement = async (e, localId) => {
     e.preventDefault();
     try {
-      const localName = locaux.find(l => l.id === localId)?.nom;
+      const targetLocalId = localId || selectedLocalForEquip;
+      const localName = locaux.find(l => l.id.toString() === targetLocalId.toString())?.nom;
       await mouvementsAPI.create({
         ...equipForm,
         local_it_destination: localName,
+        baie_destination: selectedBaieForEquip,
         type_mouvement: 'Entrée',
       });
       alert('✓ Équipement ajouté au local IT');
@@ -263,13 +277,18 @@ export default function LocalsIT() {
         <div className="rounded-[20px] bg-white p-6 shadow-lg border-l-4 border-green-500">
           <h3 className="text-xl font-bold mb-4">Ajouter une Baie Technique</h3>
           <form onSubmit={(e) => {
-            const localId = locaux[0]?.id;
+            const localId = selectedLocalForBaie || locaux[0]?.id;
             if (localId) handleAddBaie(e, localId);
             else alert('Créez d\'abord un local IT');
           }} className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-1">Sélectionner le local</label>
-              <select onChange={(e) => {}} className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 outline-none" required>
+              <select
+                value={selectedLocalForBaie}
+                onChange={(e) => setSelectedLocalForBaie(e.target.value)}
+                className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+                required
+              >
                 <option value="">-- Sélectionnez un local --</option>
                 {locaux.map(local => (
                   <option key={local.id} value={local.id}>{local.nom}</option>
@@ -317,13 +336,23 @@ export default function LocalsIT() {
         <div className="rounded-[20px] bg-white p-6 shadow-lg border-l-4 border-purple-500">
           <h3 className="text-xl font-bold mb-4">Ajouter Équipement à un Local IT</h3>
           <form onSubmit={(e) => {
-            const localId = locaux[0]?.id;
+            const localId = selectedLocalForEquip || locaux[0]?.id;
             if (localId) handleAddEquipement(e, localId);
             else alert('Créez d\'abord un local IT');
           }} className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-1">Sélectionner le local</label>
-              <select onChange={(e) => {}} className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" required>
+              <select
+                value={selectedLocalForEquip}
+                onChange={(e) => {
+                  const newLocalId = e.target.value;
+                  setSelectedLocalForEquip(newLocalId);
+                  const local = locaux.find(l => l.id.toString() === newLocalId.toString());
+                  setSelectedBaieForEquip(local?.baies?.[0]?.nom || '');
+                }}
+                className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                required
+              >
                 <option value="">-- Sélectionnez un local --</option>
                 {locaux.map(local => (
                   <option key={local.id} value={local.id}>{local.nom}</option>
@@ -375,6 +404,19 @@ export default function LocalsIT() {
                 <option>IMS</option>
                 <option>C2S</option>
                 <option>Commun</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Sélectionner la baie</label>
+              <select
+                value={selectedBaieForEquip}
+                onChange={(e) => setSelectedBaieForEquip(e.target.value)}
+                className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+              >
+                <option value="">-- Aucune baie --</option>
+                {(locaux.find(l => l.id.toString() === selectedLocalForEquip.toString())?.baies || []).map(baie => (
+                  <option key={baie.id} value={baie.nom}>{baie.nom}</option>
+                ))}
               </select>
             </div>
             <div className="flex gap-2 justify-end">

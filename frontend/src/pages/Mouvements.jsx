@@ -13,14 +13,6 @@ const equipmentTypes = [
 
 const typeStocks = ['FSS', 'IMS', 'C2S', 'Commun'];
 
-const baiesParLocal = {
-  'CIM2': ['Baie 1'],
-  'CIM6': ['Baie 1', 'Baie 2', 'Baie 3', 'Baie 4'],
-  'CIM7': ['Baie 1', 'Baie 2'],
-  'CIM4H1': ['Baie 1'],
-  'CIM4H2': ['Baie 1']
-};
-
 export default function Mouvements() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -70,14 +62,27 @@ export default function Mouvements() {
     try {
       const res = await locauxITAPI.getAll();
       setLocaux(res.data);
+      if (res.data.length > 0) {
+        const firstLocal = res.data[0];
+        setFormData((prev) => ({
+          ...prev,
+          local_it_destination: prev.local_it_destination || firstLocal.nom,
+          baie_destination: prev.baie_destination || firstLocal.baies?.[0]?.nom || '',
+        }));
+        setBaies(firstLocal.baies || []);
+      }
     } catch (error) {
       console.error('Erreur:', error);
     }
   };
 
   const loadBaies = (localNom) => {
-    const baiesForLocal = baiesParLocal[localNom] || [];
-    setBaies(baiesForLocal.map(nom => ({ id: nom, nom })));
+    const local = locaux.find(l => l.nom === localNom);
+    setBaies(local?.baies || []);
+    setFormData((prev) => ({
+      ...prev,
+      baie_destination: local?.baies?.[0]?.nom || '',
+    }));
   };
 
   const handleCreateMouvement = async (e) => {
