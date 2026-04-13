@@ -77,7 +77,8 @@ def create_default_users():
             anass.role = 'admin'
             anass.permission_export = True
             anass.permission_import = True
-            if not check_password_hash(anass.password, 'Anass@2026'):
+            # Do not recompute or re-check the hash on startup; keep existing password.
+            if not anass.password or ':' not in anass.password:
                 anass.password = generate_password_hash('Anass@2026')
 
         db.session.commit()
