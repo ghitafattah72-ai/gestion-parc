@@ -2,7 +2,7 @@
 
 Application complète de gestion du parc informatique avec gestion de stock et des locaux IT.
 
-## 🏗️ Architecture
+## Architecture
 
 ### Backend
 - **Framework**: Flask (Python)
@@ -16,7 +16,7 @@ Application complète de gestion du parc informatique avec gestion de stock et d
 - **Routing**: React Router v6
 - **Icons**: Lucide React
 
-## 📁 Structure du Projet
+##  Structure du Projet
 
 ```
 gs parc/
@@ -40,7 +40,7 @@ gs parc/
     └── schema.sql          # Schéma de base de données
 ```
 
-## 🚀 Installation et Démarrage
+##  Installation et Démarrage
 
 ### 1. Configuration de la Base de Données
 
@@ -90,7 +90,7 @@ npm start
 
 L'application React démarre sur `http://localhost:3000`
 
-## 📋 Fonctionnalités Implémentées
+##  Fonctionnalités Implémentées
 
 ### 1. Gestion du Stock
 - ✅ Affichage des matériels et quantités
@@ -128,13 +128,13 @@ L'application React démarre sur `http://localhost:3000`
 - ✅ Graphiques de quantités par type de stock
 - ✅ Mise à jour automatique
 
-## 🔐 Sécurité
+##  Sécurité
 
 - Permissions utilisateur pour export/import
 - Rôles (admin, user, manager)
 - Structure de base de données sécurisée avec contraintes
 
-## 📊 Types d'Équipements Supportés
+##  Types d'Équipements Supportés
 
 - pc portable
 - pc fixe
@@ -153,14 +153,14 @@ L'application React démarre sur `http://localhost:3000`
 - casque
 - autre
 
-## 💾 Types de Stock
+##  Types de Stock
 
 - FSS
 - IMS
 - C2S
 - Commun
 
-## 🗄️ Base de Données MySQL
+##  Base de Données MySQL
 
 **Nom de la base**: `gestion_parc`
 
@@ -173,7 +173,7 @@ L'application React démarre sur `http://localhost:3000`
 - `baies_it` - Baies techniques
 - `equipements_baies` - Liaison équipements-baies
 
-## 🔌 API Endpoints
+##  API Endpoints
 
 ### Stock
 - `GET /api/stock/` - Lister tous les stocks
@@ -204,7 +204,7 @@ L'application React démarre sur `http://localhost:3000`
 - `GET /api/locaux-it/<id>/baies` - Baies d'un local
 - `POST /api/locaux-it/<id>/baies` - Ajouter baie
 
-## 🎨 Interface Utilisateur
+##  Interface Utilisateur
 
 - Navigation latérale intuitive
 - Palette de couleurs professionnelle (bleu Hutchinson)
@@ -212,13 +212,13 @@ L'application React démarre sur `http://localhost:3000`
 - Formulaires dynamiques
 - Tables avec pagination
 
-## 📝 Fichiers Excel Supportés
+##  Fichiers Excel Supportés
 
 - `.xlsx` - Fichiers Excel modernes
 - `.xls` - Fichiers Excel classiques
 - `.csv` - Fichiers CSV
 
-## ⚙️ Configuration Environnement
+##  Configuration Environnement
 
 Fichier `.env.example`:
 
@@ -232,7 +232,7 @@ FLASK_ENV=development
 FLASK_DEBUG=True
 ```
 
-## 🐛 Dépannage
+##  Dépannage
 
 ### Erreur de connexion à MySQL
 - Vérifier que MySQL est en cours d'exécution
@@ -247,7 +247,7 @@ FLASK_DEBUG=True
 - Vérifier le format du fichier
 - S'assurer que les colonnes correspondent aux champs attendus
 
-## 📞 Support
+##  Support
 
 Pour toute question concernant l'application, veuillez contacter l'équipe IT de Hutchinson.
 

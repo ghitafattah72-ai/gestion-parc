@@ -8,7 +8,7 @@ locaux_it_bp = Blueprint('locaux_it', __name__, url_prefix='/api/locaux-it')
 @locaux_it_bp.route('/', methods=['GET'])
 def get_locaux_it():
     items = LocalIT.query.all()
-    return jsonify([local_to_dict(item) for item in items])
+    return jsonify([local_to_dict_with_baies(item) for item in items])
 
 # GET single local IT with baies
 @locaux_it_bp.route('/<int:id>', methods=['GET'])
