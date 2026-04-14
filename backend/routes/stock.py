@@ -101,6 +101,10 @@ def get_stats():
         db.func.sum(Stock.quantite).label('total_quantite'),
         db.func.count(Stock.id).label('nombre_articles')
     ).group_by(Stock.type_stock).all()
+
+    pc_portable_count = db.session.query(db.func.sum(Stock.quantite)).filter(Stock.type_equipement.ilike('%pc portable%')).scalar() or 0
+    pc_fixe_count = db.session.query(db.func.sum(Stock.quantite)).filter(Stock.type_equipement.ilike('%pc fixe%')).scalar() or 0
+    ipo_count = db.session.query(db.func.sum(Stock.quantite)).filter(Stock.type_equipement.ilike('%ipo%')).scalar() or 0
     
     return jsonify({
         'stats': [
@@ -109,7 +113,10 @@ def get_stats():
                 'total_quantite': s[1] or 0,
                 'nombre_articles': s[2]
             } for s in stats
-        ]
+        ],
+        'pc_portable': int(pc_portable_count),
+        'pc_fixe': int(pc_fixe_count),
+        'ipo': int(ipo_count)
     })
 
 # EXPORT stock to CSV/Excel

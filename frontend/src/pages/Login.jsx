@@ -20,7 +20,11 @@ function Login({ onLoginSuccess }) {
       login(response.data.user, response.data.token);
       onLoginSuccess(response.data.user);
     } catch (err) {
-      setError(err.response?.data?.message || 'Erreur d\'authentification');
+      setError(
+        err.response?.data?.message ||
+        err.message ||
+        'Erreur d\'authentification'
+      );
     } finally {
       setLoading(false);
     }

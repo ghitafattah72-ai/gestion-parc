@@ -1,10 +1,23 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
 });
+
+api.interceptors.request.use((config) => {
+  console.debug('API request:', config.method, config.baseURL + config.url, config.data || config.params || '');
+  return config;
+});
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    console.error('API response error:', error);
+    return Promise.reject(error);
+  }
+);
 
 // Stock API
 export const stockAPI = {
@@ -22,6 +35,7 @@ export const stockAPI = {
 export const mouvementsAPI = {
   getAll: (page = 1, per_page = 10, type_mouvement = null, search = '') =>
     api.get('/mouvements/', { params: { page, per_page, type_mouvement, search } }),
+  getHistorique: () => api.get('/mouvements/historique'),
   getById: (id) => api.get(`/mouvements/${id}`),
   create: (data) => api.post('/mouvements/', data),
   delete: (id) => api.delete(`/mouvements/${id}`),

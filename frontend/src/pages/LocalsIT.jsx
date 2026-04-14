@@ -73,7 +73,7 @@ export default function LocalsIT() {
       alert('✗ Erreur lors de l\'ajout');
     }
   };
-
+  
   const handleDeleteLocal = async (id) => {
     if (!window.confirm('Êtes-vous sûr de vouloir supprimer ce local?')) return;
     try {

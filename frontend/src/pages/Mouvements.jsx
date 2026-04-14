@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { mouvementsAPI, locauxITAPI } from '../api';
+import { mouvementsAPI } from '../api';
 import { Plus, Trash2, Download, Search } from 'lucide-react';
 import { RestrictedButton } from '../components/ProtectedRoute';
 import { handleExportFile } from '../utils/fileExport';
-import { EQUIPMENT_TYPES_WITH_DETAILS, MOVEMENT_TYPES } from '../constants';
 
 const equipmentTypes = [
   'pc portable', 'pc fixe', 'imprimante', 'étiquette', 'imprimante A4',
@@ -12,37 +11,35 @@ const equipmentTypes = [
 ];
 
 const typeStocks = ['FSS', 'IMS', 'C2S', 'Commun'];
+const mouvementTypes = ['Entrée', 'Sortie'];
+
+const getEmptyForm = () => ({
+  type_mouvement: 'Entrée',
+  source_entree: 'achat',
+  date_affectation: '',
+  nom_equipement: '',
+  type_equipement: '',
+  model_equipement: '',
+  numero_serie: '',
+  quantite: 1,
+  type_stock: '',
+  activite: '',
+  description: '',
+});
 
 export default function Mouvements() {
   const [items, setItems] = useState([]);
+  const [historyItems, setHistoryItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [locaux, setLocaux] = useState([]);
-  const [baies, setBaies] = useState([]);
-
-  const [formData, setFormData] = useState({
-    nom_equipement: '',
-    type_equipement: '',
-    quantite: 0,
-    type_stock: '',
-    local_it_destination: '',
-    baie_destination: '',
-    ram: '',
-    stockage: '',
-    processeur: '',
-    numero_serie: '',
-    activite: '',
-    systeme: '',
-    accessoires: '',
-    description: '',
-  });
+  const [formData, setFormData] = useState(getEmptyForm());
 
   useEffect(() => {
     loadMouvements();
-    loadLocaux();
+    loadHistory();
   }, [page, search]);
 
   const loadMouvements = async () => {
@@ -50,7 +47,7 @@ export default function Mouvements() {
       setLoading(true);
       const res = await mouvementsAPI.getAll(page, 10, null, search);
       setItems(res.data.items);
-      setTotalPages(res.data.pages);
+      setTotalPages(Math.max(1, res.data.pages || 1));
     } catch (error) {
       console.error('Erreur:', error);
     } finally {
@@ -58,31 +55,13 @@ export default function Mouvements() {
     }
   };
 
-  const loadLocaux = async () => {
+  const loadHistory = async () => {
     try {
-      const res = await locauxITAPI.getAll();
-      setLocaux(res.data);
-      if (res.data.length > 0) {
-        const firstLocal = res.data[0];
-        setFormData((prev) => ({
-          ...prev,
-          local_it_destination: prev.local_it_destination || firstLocal.nom,
-          baie_destination: prev.baie_destination || firstLocal.baies?.[0]?.nom || '',
-        }));
-        setBaies(firstLocal.baies || []);
-      }
+      const res = await mouvementsAPI.getHistorique();
+      setHistoryItems(res.data || []);
     } catch (error) {
       console.error('Erreur:', error);
     }
-  };
-
-  const loadBaies = (localNom) => {
-    const local = locaux.find(l => l.nom === localNom);
-    setBaies(local?.baies || []);
-    setFormData((prev) => ({
-      ...prev,
-      baie_destination: local?.baies?.[0]?.nom || '',
-    }));
   };
 
   const handleCreateMouvement = async (e) => {
@@ -93,30 +72,27 @@ export default function Mouvements() {
       return;
     }
 
+    if (formData.type_mouvement === 'Entrée' && (!formData.source_entree || !formData.date_affectation)) {
+      alert('Pour une entrée, source (Parc/Achat) et date d\'affectation sont obligatoires');
+      return;
+    }
+
+    if (formData.type_mouvement === 'Sortie' && !formData.activite) {
+      alert('Pour une sortie, activité est obligatoire');
+      return;
+    }
+
     try {
       await mouvementsAPI.create(formData);
       alert('Mouvement créé avec succès');
-      setFormData({
-        nom_equipement: '',
-        type_equipement: '',
-        quantite: 0,
-        type_stock: '',
-        local_it_destination: '',
-        baie_destination: '',
-        ram: '',
-        stockage: '',
-        processeur: '',
-        numero_serie: '',
-        activite: '',
-        systeme: '',
-        accessoires: '',
-        description: '',
-      });
+      setFormData(getEmptyForm());
       setShowForm(false);
       loadMouvements();
+      loadHistory();
     } catch (error) {
       console.error('Erreur:', error);
-      alert('Erreur lors de la création du mouvement');
+      const message = error?.response?.data?.error || 'Erreur lors de la création du mouvement';
+      alert(message);
     }
   };
 
@@ -127,6 +103,7 @@ export default function Mouvements() {
       await mouvementsAPI.delete(id);
       alert('Mouvement supprimé');
       loadMouvements();
+      loadHistory();
     } catch (error) {
       console.error('Erreur:', error);
       alert('Erreur lors de la suppression');
@@ -145,7 +122,7 @@ export default function Mouvements() {
     }
   };
 
-  const isPCType = ['pc portable', 'pc fixe'].includes(formData.type_equipement);
+  const isEntree = formData.type_mouvement === 'Entrée';
 
   return (
     <div className="p-6 space-y-4">
@@ -169,7 +146,7 @@ export default function Mouvements() {
             requiredAction="edit"
             className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
           >
-            <Plus size={18} /> Transférer
+            <Plus size={18} /> Nouveau mouvement
           </RestrictedButton>
         </div>
       </div>
@@ -194,9 +171,20 @@ export default function Mouvements() {
       {/* Form */}
       {showForm && (
         <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-xl font-bold mb-4">Transfert d'équipement vers Local IT</h3>
+          <h3 className="text-xl font-bold mb-4">Entrée / Sortie de stock</h3>
           <form onSubmit={handleCreateMouvement} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
+              <select
+                value={formData.type_mouvement}
+                onChange={(e) => setFormData({ ...formData, type_mouvement: e.target.value })}
+                className="p-2 border rounded"
+                required
+              >
+                {mouvementTypes.map((type) => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+
               <input
                 type="text"
                 placeholder="Nom équipement"
@@ -205,6 +193,7 @@ export default function Mouvements() {
                 className="p-2 border rounded"
                 required
               />
+
               <select
                 value={formData.type_equipement}
                 onChange={(e) => setFormData({ ...formData, type_equipement: e.target.value })}
@@ -218,13 +207,30 @@ export default function Mouvements() {
               </select>
 
               <input
+                type="text"
+                placeholder="Model"
+                value={formData.model_equipement}
+                onChange={(e) => setFormData({ ...formData, model_equipement: e.target.value })}
+                className="p-2 border rounded"
+              />
+
+              <input
+                type="text"
+                placeholder="N° de série"
+                value={formData.numero_serie}
+                onChange={(e) => setFormData({ ...formData, numero_serie: e.target.value })}
+                className="p-2 border rounded"
+              />
+
+              <input
                 type="number"
                 placeholder="Quantité"
                 value={formData.quantite}
-                onChange={(e) => setFormData({ ...formData, quantite: parseInt(e.target.value) })}
+                onChange={(e) => setFormData({ ...formData, quantite: parseInt(e.target.value || '0', 10) })}
                 className="p-2 border rounded"
                 required
               />
+
               <select
                 value={formData.type_stock}
                 onChange={(e) => setFormData({ ...formData, type_stock: e.target.value })}
@@ -237,86 +243,39 @@ export default function Mouvements() {
                 ))}
               </select>
 
-              <select
-                value={formData.local_it_destination}
-                onChange={(e) => {
-                  setFormData({ ...formData, local_it_destination: e.target.value });
-                  if (e.target.value) loadBaies(e.target.value);
-                }}
-                className="p-2 border rounded"
-                required
-              >
-                <option value="">Sélectionner Local IT</option>
-                {locaux.map(local => (
-                  <option key={local.id} value={local.nom}>{local.nom}</option>
-                ))}
-              </select>
-
-              <select
-                value={formData.baie_destination}
-                onChange={(e) => setFormData({ ...formData, baie_destination: e.target.value })}
-                className="p-2 border rounded"
-              >
-                <option value="">Sélectionner Baie (optionnel)</option>
-                {baies.map(baie => (
-                  <option key={baie.id} value={baie.nom}>{baie.nom}</option>
-                ))}
-              </select>
+              {isEntree ? (
+                <>
+                  <select
+                    value={formData.source_entree}
+                    onChange={(e) => setFormData({ ...formData, source_entree: e.target.value })}
+                    className="p-2 border rounded"
+                    required
+                  >
+                    <option value="achat">Achat</option>
+                    <option value="parc">Parc</option>
+                  </select>
+                  <input
+                    type="date"
+                    value={formData.date_affectation}
+                    onChange={(e) => setFormData({ ...formData, date_affectation: e.target.value })}
+                    className="p-2 border rounded"
+                    required
+                  />
+                </>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    placeholder="Activité"
+                    value={formData.activite}
+                    onChange={(e) => setFormData({ ...formData, activite: e.target.value })}
+                    className="p-2 border rounded"
+                    required
+                  />
+                  <div />
+                </>
+              )}
             </div>
-
-            {isPCType && (
-              <div className="grid grid-cols-2 gap-4 border-t pt-4">
-                <input
-                  type="text"
-                  placeholder="RAM"
-                  value={formData.ram}
-                  onChange={(e) => setFormData({ ...formData, ram: e.target.value })}
-                  className="p-2 border rounded"
-                />
-                <input
-                  type="text"
-                  placeholder="Stockage"
-                  value={formData.stockage}
-                  onChange={(e) => setFormData({ ...formData, stockage: e.target.value })}
-                  className="p-2 border rounded"
-                />
-                <input
-                  type="text"
-                  placeholder="Processeur"
-                  value={formData.processeur}
-                  onChange={(e) => setFormData({ ...formData, processeur: e.target.value })}
-                  className="p-2 border rounded"
-                />
-                <input
-                  type="text"
-                  placeholder="N° de série"
-                  value={formData.numero_serie}
-                  onChange={(e) => setFormData({ ...formData, numero_serie: e.target.value })}
-                  className="p-2 border rounded"
-                />
-                <input
-                  type="text"
-                  placeholder="Activité"
-                  value={formData.activite}
-                  onChange={(e) => setFormData({ ...formData, activite: e.target.value })}
-                  className="p-2 border rounded"
-                />
-                <input
-                  type="text"
-                  placeholder="Système"
-                  value={formData.systeme}
-                  onChange={(e) => setFormData({ ...formData, systeme: e.target.value })}
-                  className="p-2 border rounded"
-                />
-                <textarea
-                  placeholder="Accessoires"
-                  value={formData.accessoires}
-                  onChange={(e) => setFormData({ ...formData, accessoires: e.target.value })}
-                  className="p-2 border rounded col-span-2"
-                  rows="2"
-                />
-              </div>
-            )}
 
             <textarea
               placeholder="Description du mouvement"
@@ -328,7 +287,7 @@ export default function Mouvements() {
 
             <div className="flex gap-2 justify-end">
               <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 bg-gray-300 rounded">Annuler</button>
-              <button type="submit" className="px-4 py-2 bg-blue-500 text-white rounded">Créer Mouvement</button>
+              <button type="submit" className="px-4 py-2 bg-blue-500 text-white rounded">Enregistrer</button>
             </div>
           </form>
         </div>
@@ -339,28 +298,34 @@ export default function Mouvements() {
         <table className="w-full text-sm">
           <thead className="bg-gray-100 border-b">
             <tr>
+              <th className="p-3 text-left">Type Mvt</th>
               <th className="p-3 text-left">Équipement</th>
               <th className="p-3 text-left">Type</th>
+              <th className="p-3 text-left">Model</th>
+              <th className="p-3 text-left">N° Série</th>
               <th className="p-3 text-left">Quantité</th>
-              <th className="p-3 text-left">Local IT</th>
-              <th className="p-3 text-left">Baie</th>
+              <th className="p-3 text-left">Source Entrée</th>
+              <th className="p-3 text-left">Activité</th>
               <th className="p-3 text-left">Date</th>
               <th className="p-3 text-left">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="7" className="p-3 text-center">Chargement...</td></tr>
+              <tr><td colSpan="10" className="p-3 text-center">Chargement...</td></tr>
             ) : items.length === 0 ? (
-              <tr><td colSpan="7" className="p-3 text-center">Aucun mouvement</td></tr>
+              <tr><td colSpan="10" className="p-3 text-center">Aucun mouvement</td></tr>
             ) : (
               items.map(item => (
                 <tr key={item.id} className="border-b hover:bg-gray-50">
+                  <td className="p-3 font-medium">{item.type_mouvement}</td>
                   <td className="p-3">{item.nom_equipement}</td>
                   <td className="p-3">{item.type_equipement}</td>
+                  <td className="p-3">{item.model_equipement || '-'}</td>
+                  <td className="p-3">{item.numero_serie || '-'}</td>
                   <td className="p-3">{item.quantite}</td>
-                  <td className="p-3">{item.local_it_destination || '-'}</td>
-                  <td className="p-3">{item.baie_destination || '-'}</td>
+                  <td className="p-3">{item.source_entree || '-'}</td>
+                  <td className="p-3">{item.activite || '-'}</td>
                   <td className="p-3">{new Date(item.date_mouvement).toLocaleDateString()}</td>
                   <td className="p-3">
                     <RestrictedButton
@@ -371,6 +336,38 @@ export default function Mouvements() {
                       <Trash2 size={18} />
                     </RestrictedButton>
                   </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="bg-white rounded-lg shadow overflow-x-auto">
+        <div className="p-4 border-b">
+          <h3 className="text-lg font-semibold">Historique des mouvements supprimés</h3>
+        </div>
+        <table className="w-full text-sm">
+          <thead className="bg-gray-100 border-b">
+            <tr>
+              <th className="p-3 text-left">Équipement</th>
+              <th className="p-3 text-left">Type Mvt</th>
+              <th className="p-3 text-left">Model</th>
+              <th className="p-3 text-left">N° Série</th>
+              <th className="p-3 text-left">Date Suppression</th>
+            </tr>
+          </thead>
+          <tbody>
+            {historyItems.length === 0 ? (
+              <tr><td colSpan="5" className="p-3 text-center">Aucun historique</td></tr>
+            ) : (
+              historyItems.map((item) => (
+                <tr key={item.id} className="border-b hover:bg-gray-50">
+                  <td className="p-3">{item.nom_equipement}</td>
+                  <td className="p-3">{item.type_mouvement}</td>
+                  <td className="p-3">{item.model_equipement || '-'}</td>
+                  <td className="p-3">{item.numero_serie || '-'}</td>
+                  <td className="p-3">{item.date_suppression ? new Date(item.date_suppression).toLocaleString() : '-'}</td>
                 </tr>
               ))
             )}

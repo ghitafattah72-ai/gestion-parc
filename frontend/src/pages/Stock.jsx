@@ -236,7 +236,9 @@ export default function Stock() {
                 ))}
               </select>
             </div>
-
+            <div>
+            
+            </div>
             {isPCType && (
               <div className="grid grid-cols-2 gap-4 border-t pt-4">
                 <input

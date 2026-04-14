@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api';
 
 export const AuthContext = createContext();
 
@@ -16,7 +16,21 @@ export function AuthProvider({ children }) {
     if (storedToken && storedUser) {
       setToken(storedToken);
       setUser(JSON.parse(storedUser));
-      axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+      api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+
+      // Refresh user from backend so role/permissions stay in sync.
+      api.get('/auth/me')
+        .then((res) => {
+          setUser(res.data);
+          localStorage.setItem('user', JSON.stringify(res.data));
+        })
+        .catch(() => {
+          setUser(null);
+          setToken(null);
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          delete api.defaults.headers.common['Authorization'];
+        });
     }
 
     setLoading(false);
@@ -27,7 +41,7 @@ export function AuthProvider({ children }) {
     setToken(authToken);
     localStorage.setItem('token', authToken);
     localStorage.setItem('user', JSON.stringify(userData));
-    axios.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
+    api.defaults.headers.common['Authorization'] = `Bearer ${authToken}`;
   };
 
   const logout = () => {
@@ -35,18 +49,26 @@ export function AuthProvider({ children }) {
     setToken(null);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    delete axios.defaults.headers.common['Authorization'];
+    delete api.defaults.headers.common['Authorization'];
   };
 
   const hasPermission = (action) => {
     if (!user) return false;
 
+    const normalizedRole = (user.role || '').toLowerCase().trim();
+    const normalizedAction = (action || '').toLowerCase().trim();
+
     // Admin can do everything
-    if (user.role === 'admin') return true;
+    if (normalizedRole === 'admin') return true;
+
+    if (normalizedAction === 'view') return true;
+
+    if (normalizedAction === 'import') return !!user.permission_import;
+    if (normalizedAction === 'export') return !!user.permission_export;
 
     // View only can only view
-    if (user.role === 'view_only') {
-      return action === 'view';
+    if (normalizedRole === 'view_only') {
+      return false;
     }
 
     return false;

@@ -1,16 +1,54 @@
-from flask import Blueprint, jsonify, request, send_file
+from flask import Blueprint, jsonify, request
 from models import db, Parc
 from datetime import datetime
-import csv
-import io
 import pandas as pd
-from openpyxl import Workbook
-from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import Utilisateur
 from decorators import check_permission
 from export_utils import export_to_csv, export_to_excel, get_export_filename
 
 parc_bp = Blueprint('parc', __name__, url_prefix='/api/parc')
+
+PARC_EXPORT_HEADERS = [
+    'Name',
+    'Alternate username',
+    'Operating System - Name',
+    'Operating System - Version',
+    'Type',
+    'Model',
+    'Manufacturer',
+    'N° de série',
+    'Processeur',
+    'RAM',
+    'Disque dur',
+    'Emplacement',
+    'Service',
+    'ESU',
+]
+
+
+def _clean_value(value):
+    if value is None:
+        return None
+    if isinstance(value, float) and pd.isna(value):
+        return None
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped if stripped else None
+    return str(value).strip()
+
+
+def _first_value(row, aliases):
+    for alias in aliases:
+        if alias in row:
+            value = _clean_value(row.get(alias))
+            if value is not None:
+                return value
+    return None
+
+
+def _payload_value(data, key):
+    if not data:
+        return None
+    return _clean_value(data.get(key))
 
 # GET all parc items
 @parc_bp.route('/', methods=['GET'])
@@ -25,7 +63,9 @@ def get_parc():
         query = query.filter(
             (Parc.name.ilike(f'%{search}%')) |
             (Parc.numero_serie.ilike(f'%{search}%')) |
-            (Parc.alternate_username.ilike(f'%{search}%'))
+            (Parc.alternate_username.ilike(f'%{search}%')) |
+            (Parc.type.ilike(f'%{search}%')) |
+            (Parc.model.ilike(f'%{search}%'))
         )
     
     items = query.paginate(page=page, per_page=per_page)
@@ -46,24 +86,50 @@ def get_parc_item(id):
 # POST new parc item
 @parc_bp.route('/', methods=['POST'])
 def create_parc_item():
-    data = request.json
+    data = request.json or {}
     
     try:
+        payload = {
+            'name': _payload_value(data, 'name'),
+            'alternate_username': _payload_value(data, 'alternate_username'),
+            'os_name': _payload_value(data, 'os_name'),
+            'os_version': _payload_value(data, 'os_version'),
+            'type': _payload_value(data, 'type'),
+            'model': _payload_value(data, 'model'),
+            'manufacturer': _payload_value(data, 'manufacturer'),
+            'numero_serie': _payload_value(data, 'numero_serie'),
+            'processeur': _payload_value(data, 'processeur'),
+            'ram': _payload_value(data, 'ram'),
+            'disque_dur': _payload_value(data, 'disque_dur'),
+            'emplacement': _payload_value(data, 'emplacement'),
+            'service': _payload_value(data, 'service'),
+            'esu': _payload_value(data, 'esu'),
+        }
+
+        if not payload['name']:
+            return jsonify({'error': 'Le champ Name est obligatoire'}), 400
+        if not payload['type']:
+            return jsonify({'error': 'Le champ Type est obligatoire'}), 400
+        if payload['numero_serie']:
+            existing_serial = Parc.query.filter_by(numero_serie=payload['numero_serie']).first()
+            if existing_serial:
+                return jsonify({'error': 'Ce numéro de série existe déjà'}), 400
+
         new_item = Parc(
-            name=data.get('name'),
-            alternate_username=data.get('alternate_username'),
-            os_name=data.get('os_name'),
-            os_version=data.get('os_version'),
-            type=data.get('type'),
-            model=data.get('model'),
-            manufacturer=data.get('manufacturer'),
-            numero_serie=data.get('numero_serie'),
-            processeur=data.get('processeur'),
-            ram=data.get('ram'),
-            disque_dur=data.get('disque_dur'),
-            emplacement=data.get('emplacement'),
-            service=data.get('service'),
-            esu=data.get('esu')
+            name=payload['name'],
+            alternate_username=payload['alternate_username'],
+            os_name=payload['os_name'],
+            os_version=payload['os_version'],
+            type=payload['type'],
+            model=payload['model'],
+            manufacturer=payload['manufacturer'],
+            numero_serie=payload['numero_serie'],
+            processeur=payload['processeur'],
+            ram=payload['ram'],
+            disque_dur=payload['disque_dur'],
+            emplacement=payload['emplacement'],
+            service=payload['service'],
+            esu=payload['esu']
         )
         
         db.session.add(new_item)
@@ -81,23 +147,37 @@ def create_parc_item():
 @parc_bp.route('/<int:id>', methods=['PUT'])
 def update_parc_item(id):
     item = Parc.query.get_or_404(id)
-    data = request.json
+    data = request.json or {}
     
     try:
-        item.name = data.get('name', item.name)
-        item.alternate_username = data.get('alternate_username', item.alternate_username)
-        item.os_name = data.get('os_name', item.os_name)
-        item.os_version = data.get('os_version', item.os_version)
-        item.type = data.get('type', item.type)
-        item.model = data.get('model', item.model)
-        item.manufacturer = data.get('manufacturer', item.manufacturer)
-        item.numero_serie = data.get('numero_serie', item.numero_serie)
-        item.processeur = data.get('processeur', item.processeur)
-        item.ram = data.get('ram', item.ram)
-        item.disque_dur = data.get('disque_dur', item.disque_dur)
-        item.emplacement = data.get('emplacement', item.emplacement)
-        item.service = data.get('service', item.service)
-        item.esu = data.get('esu', item.esu)
+        next_name = _payload_value(data, 'name')
+        next_type = _payload_value(data, 'type')
+        next_serial = _payload_value(data, 'numero_serie')
+
+        if not next_name:
+            return jsonify({'error': 'Le champ Name est obligatoire'}), 400
+        if not next_type:
+            return jsonify({'error': 'Le champ Type est obligatoire'}), 400
+
+        if next_serial:
+            serial_owner = Parc.query.filter_by(numero_serie=next_serial).first()
+            if serial_owner and serial_owner.id != item.id:
+                return jsonify({'error': 'Ce numéro de série existe déjà'}), 400
+
+        item.name = next_name
+        item.alternate_username = _payload_value(data, 'alternate_username')
+        item.os_name = _payload_value(data, 'os_name')
+        item.os_version = _payload_value(data, 'os_version')
+        item.type = next_type
+        item.model = _payload_value(data, 'model')
+        item.manufacturer = _payload_value(data, 'manufacturer')
+        item.numero_serie = next_serial
+        item.processeur = _payload_value(data, 'processeur')
+        item.ram = _payload_value(data, 'ram')
+        item.disque_dur = _payload_value(data, 'disque_dur')
+        item.emplacement = _payload_value(data, 'emplacement')
+        item.service = _payload_value(data, 'service')
+        item.esu = _payload_value(data, 'esu')
         item.date_modification = datetime.utcnow()
         
         db.session.commit()
@@ -149,43 +229,49 @@ def import_parc():
         
         for index, row in df.iterrows():
             try:
-                # Check if serial number already exists
-                existing = Parc.query.filter_by(numero_serie=row.get('N° de série')).first()
+                serial_number = _first_value(row, ['N° de série', 'N° Série', 'Numero de série', 'Numero serie', 'Serial Number'])
+                existing = Parc.query.filter_by(numero_serie=serial_number).first() if serial_number else None
+
+                payload = {
+                    'name': _first_value(row, ['Name', 'Nom', 'nom']),
+                    'alternate_username': _first_value(row, ['Alternate username', 'User', 'Utilisateur']),
+                    'os_name': _first_value(row, ['Operating System - Name', 'OS Name']),
+                    'os_version': _first_value(row, ['Operating System - Version', 'OS Version']),
+                    'type': _first_value(row, ['Type', 'Équipement', 'equipement']),
+                    'model': _first_value(row, ['Model', 'Modèle', 'modele']),
+                    'manufacturer': _first_value(row, ['Manufacturer', 'Constructeur']),
+                    'numero_serie': serial_number,
+                    'processeur': _first_value(row, ['Processeur', 'CPU']),
+                    'ram': _first_value(row, ['RAM', 'Mémoire', 'Memoire']),
+                    'disque_dur': _first_value(row, ['Disque dur', 'Stockage']),
+                    'emplacement': _first_value(row, ['Emplacement', 'Location']),
+                    'service': _first_value(row, ['Service', 'Département', 'Departement']),
+                    'esu': _first_value(row, ['ESU']),
+                }
+
+                if not payload['name']:
+                    errors.append(f'Row {index + 1}: Name is required')
+                    continue
                 
                 if existing:
                     # Update
-                    existing.name = row.get('Name', existing.name)
-                    existing.alternate_username = row.get('Alternate username', existing.alternate_username)
-                    existing.os_name = row.get('Operating System - Name', existing.os_name)
-                    existing.os_version = row.get('Operating System - Version', existing.os_version)
-                    existing.type = row.get('Type', existing.type)
-                    existing.model = row.get('Model', existing.model)
-                    existing.manufacturer = row.get('Manufacturer', existing.manufacturer)
-                    existing.processeur = row.get('Processeur', existing.processeur)
-                    existing.ram = row.get('RAM', existing.ram)
-                    existing.disque_dur = row.get('Disque dur', existing.disque_dur)
-                    existing.emplacement = row.get('Emplacement', existing.emplacement)
-                    existing.service = row.get('Service', existing.service)
-                    existing.esu = row.get('ESU', existing.esu)
+                    existing.name = payload['name'] or existing.name
+                    existing.alternate_username = payload['alternate_username'] or existing.alternate_username
+                    existing.os_name = payload['os_name'] or existing.os_name
+                    existing.os_version = payload['os_version'] or existing.os_version
+                    existing.type = payload['type'] or existing.type
+                    existing.model = payload['model'] or existing.model
+                    existing.manufacturer = payload['manufacturer'] or existing.manufacturer
+                    existing.processeur = payload['processeur'] or existing.processeur
+                    existing.ram = payload['ram'] or existing.ram
+                    existing.disque_dur = payload['disque_dur'] or existing.disque_dur
+                    existing.emplacement = payload['emplacement'] or existing.emplacement
+                    existing.service = payload['service'] or existing.service
+                    existing.esu = payload['esu'] or existing.esu
                     existing.date_modification = datetime.utcnow()
                 else:
                     # Create new
-                    new_item = Parc(
-                        name=row.get('Name'),
-                        alternate_username=row.get('Alternate username'),
-                        os_name=row.get('Operating System - Name'),
-                        os_version=row.get('Operating System - Version'),
-                        type=row.get('Type'),
-                        model=row.get('Model'),
-                        manufacturer=row.get('Manufacturer'),
-                        numero_serie=row.get('N° de série'),
-                        processeur=row.get('Processeur'),
-                        ram=row.get('RAM'),
-                        disque_dur=row.get('Disque dur'),
-                        emplacement=row.get('Emplacement'),
-                        service=row.get('Service'),
-                        esu=row.get('ESU')
-                    )
+                    new_item = Parc(**payload)
                     db.session.add(new_item)
                 
                 imported_count += 1
@@ -203,6 +289,41 @@ def import_parc():
         db.session.rollback()
         return jsonify({'error': str(e)}), 400
 
+
+# EXPORT parc to Excel/CSV
+@parc_bp.route('/export', methods=['GET'])
+@check_permission('export')
+def export_parc():
+    format_type = request.args.get('format', 'csv').lower()
+    if format_type not in ['csv', 'xlsx']:
+        return jsonify({'error': 'Invalid format. Use csv or xlsx'}), 400
+
+    items = Parc.query.all()
+    rows = [
+        [
+            item.name,
+            item.alternate_username,
+            item.os_name,
+            item.os_version,
+            item.type,
+            item.model,
+            item.manufacturer,
+            item.numero_serie,
+            item.processeur,
+            item.ram,
+            item.disque_dur,
+            item.emplacement,
+            item.service,
+            item.esu,
+        ]
+        for item in items
+    ]
+
+    filename = get_export_filename('parc', format_type)
+    if format_type == 'xlsx':
+        return export_to_excel(PARC_EXPORT_HEADERS, rows, filename, sheet_name='Parc')
+    return export_to_csv(PARC_EXPORT_HEADERS, rows, filename)
+
 # GET parc statistics
 @parc_bp.route('/stats', methods=['GET'])
 def get_parc_stats():
@@ -215,6 +336,7 @@ def get_parc_stats():
     # Specific counts requested - case insensitive search
     pc_portable_count = Parc.query.filter(Parc.type.ilike('%pc portable%')).count()
     pc_fixe_count = Parc.query.filter(Parc.type.ilike('%pc fixe%')).count()
+    ipo_count = Parc.query.filter(Parc.type.ilike('%ipo%')).count()
     imprimante_count = Parc.query.filter(Parc.type.ilike('%imprimante%')).count()
     
     return jsonify({
@@ -226,65 +348,10 @@ def get_parc_stats():
         ],
         'pc_portable': pc_portable_count,
         'pc_fixe': pc_fixe_count,
+        'ipo': ipo_count,
         'imprimante': imprimante_count,
         'total': Parc.query.count()
     })
-    format_type = request.args.get('format', 'csv')
-    
-    items = Parc.query.all()
-    
-    if format_type == 'xlsx':
-        # Export to Excel
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "Parc"
-        
-        headers = ['Name', 'Alternate username', 'Operating System - Name', 'Operating System - Version',
-                   'Type', 'Model', 'Manufacturer', 'N° de série', 'Processeur', 'RAM', 'Disque dur',
-                   'Emplacement', 'Service', 'ESU']
-        ws.append(headers)
-        
-        for item in items:
-            ws.append([
-                item.name, item.alternate_username, item.os_name, item.os_version,
-                item.type, item.model, item.manufacturer, item.numero_serie,
-                item.processeur, item.ram, item.disque_dur, item.emplacement,
-                item.service, item.esu
-            ])
-        
-        output = io.BytesIO()
-        wb.save(output)
-        output.seek(0)
-        
-        return send_file(
-            output,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True,
-            download_name=f'parc_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
-        )
-    else:
-        # Export to CSV
-        output = io.StringIO()
-        writer = csv.writer(output)
-        
-        writer.writerow(['Name', 'Alternate username', 'Operating System - Name', 'Operating System - Version',
-                        'Type', 'Model', 'Manufacturer', 'N° de série', 'Processeur', 'RAM', 'Disque dur',
-                        'Emplacement', 'Service', 'ESU'])
-        
-        for item in items:
-            writer.writerow([
-                item.name, item.alternate_username, item.os_name, item.os_version,
-                item.type, item.model, item.manufacturer, item.numero_serie,
-                item.processeur, item.ram, item.disque_dur, item.emplacement,
-                item.service, item.esu
-            ])
-        
-        return send_file(
-            io.BytesIO(output.getvalue().encode()),
-            mimetype='text/csv',
-            as_attachment=True,
-            download_name=f'parc_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
-        )
 
 def parc_to_dict(item):
     return {

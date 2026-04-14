@@ -6,6 +6,11 @@ from datetime import datetime
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
+DEFAULT_ADMIN_CREDENTIALS = {
+    'anass': 'Anass@2026',
+    'admin': 'Admin@2026',
+}
+
 # Login endpoint
 @auth_bp.route('/login', methods=['POST'])
 def login():
@@ -16,14 +21,16 @@ def login():
     if not nom or not password:
         return jsonify({'message': 'Nom d\'utilisateur et mot de passe requis'}), 400
 
-    # Special admin user: Anass peut tout faire
-    if nom.lower() == 'anass' and password == 'Anass@2026':
-        user = Utilisateur.query.filter_by(nom='anass').first()
+    # Ensure demo admin accounts are always accessible with their default passwords
+    normalized_nom = nom.lower()
+    default_password = DEFAULT_ADMIN_CREDENTIALS.get(normalized_nom)
+    if default_password and password == default_password:
+        user = Utilisateur.query.filter_by(nom=normalized_nom).first()
         if not user:
             user = Utilisateur(
-                nom='anass',
-                email='anass@hutchinson.fr',
-                password=generate_password_hash('Anass@2026'),
+                nom=normalized_nom,
+                email=f'{normalized_nom}@hutchinson.fr',
+                password=generate_password_hash(default_password),
                 role='admin',
                 permission_export=True,
                 permission_import=True,
@@ -31,7 +38,7 @@ def login():
             )
             db.session.add(user)
         else:
-            # Ensure existing anass remains admin and has the correct password
+            # Keep these accounts in admin mode and repair password hash if needed.
             user.role = 'admin'
             user.permission_export = True
             user.permission_import = True

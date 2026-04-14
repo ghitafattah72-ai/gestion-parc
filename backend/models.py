@@ -73,6 +73,29 @@ class Mouvement(db.Model):
         return f'<Mouvement {self.id}>'
 
 
+class MouvementHistorique(db.Model):
+    __tablename__ = 'mouvements_historique'
+
+    id = db.Column(db.Integer, primary_key=True)
+    mouvement_id_original = db.Column(db.Integer, nullable=False)
+    nom_equipement = db.Column(db.String(255), nullable=False)
+    type_equipement = db.Column(db.String(100), nullable=False)
+    type_mouvement = db.Column(db.String(50), nullable=False)
+    quantite = db.Column(db.Integer, nullable=False)
+    type_stock = db.Column(db.String(50), nullable=False)
+    local_it_destination = db.Column(db.String(100))
+    baie_destination = db.Column(db.String(100))
+    model_equipement = db.Column(db.String(255))
+    numero_serie = db.Column(db.String(100))
+    activite = db.Column(db.String(100))
+    description = db.Column(db.Text)
+    date_mouvement_originale = db.Column(db.DateTime)
+    date_suppression = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<MouvementHistorique {self.mouvement_id_original}>'
+
+
 class Parc(db.Model):
     __tablename__ = 'parc'
     

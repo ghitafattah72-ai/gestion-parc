@@ -5,12 +5,17 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 export default function Dashboard() {
   const [stats, setStats] = useState({
     stock: [],
+    stockTypes: {
+      pc_portable: 0,
+      pc_fixe: 0,
+      ipo: 0,
+    },
     mouvements: [],
     locaux: 0,
     parc: {
       pc_portable: 0,
       pc_fixe: 0,
-      imprimante: 0,
+      ipo: 0,
       total: 0
     }
   });
@@ -32,6 +37,11 @@ export default function Dashboard() {
 
       setStats({
         stock: stockRes.data.stats,
+        stockTypes: {
+          pc_portable: stockRes.data.pc_portable || 0,
+          pc_fixe: stockRes.data.pc_fixe || 0,
+          ipo: stockRes.data.ipo || 0,
+        },
         mouvements: mouvementsRes.data.stats,
         locaux: locauxRes.data?.length || 0,
         parc: parcRes.data,
@@ -45,16 +55,22 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard title="Nombre de Stocks" value={stats.stock?.length || 0} color="from-sky-500 to-sky-600" />
-        <StatCard title="Mouvements Actifs" value={stats.mouvements?.length || 0} color="from-emerald-500 to-emerald-600" />
-        <StatCard title="Locaux IT" value={stats.locaux} color="from-violet-500 to-violet-600" />
+      <div className="bg-white p-4 rounded-[20px] shadow border border-slate-200">
+        <h3 className="text-lg font-semibold text-slate-900 mb-3">Stock</h3>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <StatCard title="PC Portables" value={stats.stockTypes.pc_portable} color="from-rose-500 to-rose-600" />
+          <StatCard title="PC Fixes" value={stats.stockTypes.pc_fixe} color="from-amber-500 to-amber-600" />
+          <StatCard title="IPO" value={stats.stockTypes.ipo} color="from-indigo-500 to-indigo-600" />
+        </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <StatCard title="PC Portables" value={stats.parc.pc_portable} color="from-rose-500 to-rose-600" />
-        <StatCard title="PC Fixes" value={stats.parc.pc_fixe} color="from-amber-500 to-amber-600" />
-        <StatCard title="Imprimantes" value={stats.parc.imprimante} color="from-indigo-500 to-indigo-600" />
+      <div className="bg-white p-4 rounded-[20px] shadow border border-slate-200">
+        <h3 className="text-lg font-semibold text-slate-900 mb-3">Parc</h3>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <StatCard title="PC Portables" value={stats.parc.pc_portable} color="from-pink-500 to-pink-600" />
+          <StatCard title="PC Fixes" value={stats.parc.pc_fixe} color="from-orange-500 to-orange-600" />
+          <StatCard title="IPO" value={stats.parc.ipo || 0} color="from-cyan-500 to-cyan-600" />
+        </div>
       </div>
 
       {stats.stock.length > 0 && (

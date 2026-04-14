@@ -33,3 +33,4 @@ export const handleExportFile = async (apiCall, format, filename, params = {}) =
     throw new Error('Erreur lors de l\'export');
   }
 };
+  
