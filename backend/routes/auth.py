@@ -11,6 +11,13 @@ DEFAULT_ADMIN_CREDENTIALS = {
     'admin': 'Admin@2026',
 }
 
+
+def _get_current_user_id():
+    try:
+        return int(get_jwt_identity())
+    except (TypeError, ValueError):
+        return None
+
 # Login endpoint
 @auth_bp.route('/login', methods=['POST'])
 def login():
@@ -46,7 +53,7 @@ def login():
                 user.password = generate_password_hash(password)
 
         db.session.commit()
-        access_token = create_access_token(identity=user.id)
+        access_token = create_access_token(identity=str(user.id))
         return jsonify({
             'token': access_token,
             'user': {
@@ -76,7 +83,7 @@ def login():
     elif not check_password_hash(user.password, password):
         return jsonify({'message': 'Mot de passe incorrect'}), 401
 
-    access_token = create_access_token(identity=user.id)
+    access_token = create_access_token(identity=str(user.id))
     return jsonify({
         'token': access_token,
         'user': {
@@ -93,7 +100,9 @@ def login():
 @auth_bp.route('/register', methods=['POST'])
 @jwt_required()
 def register():
-    current_user_id = get_jwt_identity()
+    current_user_id = _get_current_user_id()
+    if current_user_id is None:
+        return jsonify({'message': 'Token invalide'}), 401
     current_user = Utilisateur.query.get(current_user_id)
 
     # Only admins can create users
@@ -145,7 +154,9 @@ def register():
 @auth_bp.route('/me', methods=['GET'])
 @jwt_required()
 def get_current_user():
-    current_user_id = get_jwt_identity()
+    current_user_id = _get_current_user_id()
+    if current_user_id is None:
+        return jsonify({'message': 'Token invalide'}), 401
     user = Utilisateur.query.get(current_user_id)
 
     if not user:

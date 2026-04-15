@@ -13,10 +13,14 @@ const equipmentTypes = [
 const typeStocks = ['FSS', 'IMS', 'C2S', 'Commun'];
 const mouvementTypes = ['Entrée', 'Sortie'];
 
+const getTodayDateInput = () => new Date().toISOString().split('T')[0];
+
 const getEmptyForm = () => ({
   type_mouvement: 'Entrée',
   source_entree: 'achat',
-  date_affectation: '',
+  date_affectation: getTodayDateInput(),
+  stock_item_id: '',
+  parc_item_id: '',
   nom_equipement: '',
   type_equipement: '',
   model_equipement: '',
@@ -32,6 +36,11 @@ export default function Mouvements() {
   const [historyItems, setHistoryItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [sourceItems, setSourceItems] = useState([]);
+  const [availableStockTypes, setAvailableStockTypes] = useState([]);
+  const [availableParcTypes, setAvailableParcTypes] = useState([]);
+  const [sourceLoading, setSourceLoading] = useState(false);
+  const [sourceSearch, setSourceSearch] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -67,25 +76,52 @@ export default function Mouvements() {
   const handleCreateMouvement = async (e) => {
     e.preventDefault();
 
-    if (!formData.nom_equipement || !formData.type_equipement || !formData.quantite || !formData.type_stock) {
-      alert('Veuillez remplir les champs obligatoires');
+    const isEntree = formData.type_mouvement === 'Entrée';
+    const isSortie = formData.type_mouvement === 'Sortie';
+    const isEntreeAchat = isEntree && formData.source_entree === 'achat';
+    const isEntreeParc = isEntree && formData.source_entree === 'parc';
+
+    if (!formData.quantite || formData.quantite < 1) {
+      alert('Quantité invalide');
       return;
     }
 
-    if (formData.type_mouvement === 'Entrée' && (!formData.source_entree || !formData.date_affectation)) {
-      alert('Pour une entrée, source (Parc/Achat) et date d\'affectation sont obligatoires');
-      return;
+    if (isSortie) {
+      if (!formData.type_equipement || !formData.stock_item_id) {
+        alert('Pour une sortie, choisissez le type et un équipement du stock');
+        return;
+      }
+      if (!formData.activite) {
+        alert('Pour une sortie, activité est obligatoire');
+        return;
+      }
     }
 
-    if (formData.type_mouvement === 'Sortie' && !formData.activite) {
-      alert('Pour une sortie, activité est obligatoire');
-      return;
+    if (isEntreeAchat) {
+      if (!formData.nom_equipement || !formData.type_equipement || !formData.type_stock) {
+        alert('Pour une entrée achat, nom, type et type stock sont obligatoires');
+        return;
+      }
     }
+
+    if (isEntreeParc) {
+      if (!formData.type_equipement || !formData.parc_item_id || !formData.type_stock) {
+        alert('Pour une entrée depuis parc, choisissez type, équipement parc et type stock destination');
+        return;
+      }
+    }
+
+    const payload = {
+      ...formData,
+      quantite: isEntreeParc ? 1 : formData.quantite,
+    };
 
     try {
-      await mouvementsAPI.create(formData);
+      await mouvementsAPI.create(payload);
       alert('Mouvement créé avec succès');
       setFormData(getEmptyForm());
+      setSourceItems([]);
+      setSourceSearch('');
       setShowForm(false);
       loadMouvements();
       loadHistory();
@@ -122,7 +158,210 @@ export default function Mouvements() {
     }
   };
 
+  useEffect(() => {
+    const loadSourceTypes = async () => {
+      try {
+        const [stockRes, parcRes] = await Promise.all([
+          mouvementsAPI.getStockSources('', ''),
+          mouvementsAPI.getParcSources('', ''),
+        ]);
+
+        const stockTypes = Array.from(
+          new Set((stockRes.data || []).map((item) => (item.type_equipement || '').trim()).filter(Boolean))
+        ).sort((a, b) => a.localeCompare(b));
+
+        const parcTypes = Array.from(
+          new Set((parcRes.data || []).map((item) => (item.type_equipement || '').trim()).filter(Boolean))
+        ).sort((a, b) => a.localeCompare(b));
+
+        setAvailableStockTypes(stockTypes);
+        setAvailableParcTypes(parcTypes);
+      } catch (error) {
+        setAvailableStockTypes([]);
+        setAvailableParcTypes([]);
+      }
+    };
+
+    loadSourceTypes();
+  }, [showForm]);
+
+  useEffect(() => {
+    if (!showForm) return;
+    if (formData.type_mouvement !== 'Sortie') return;
+    if (formData.type_equipement) return;
+    if (availableStockTypes.length === 0) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      type_equipement: availableStockTypes[0],
+      stock_item_id: '',
+      nom_equipement: '',
+      model_equipement: '',
+      numero_serie: '',
+      type_stock: '',
+      quantite: 1,
+      activite: 'Transfert vers parc',
+    }));
+  }, [showForm, formData.type_mouvement, formData.type_equipement, availableStockTypes]);
+
+  useEffect(() => {
+    if (!showForm) return;
+    const isEntreeParc = formData.type_mouvement === 'Entrée' && formData.source_entree === 'parc';
+    if (!isEntreeParc || sourceLoading) return;
+
+    if (!sourceItems.length) {
+      if (!formData.parc_item_id) return;
+      setFormData((prev) => ({
+        ...prev,
+        parc_item_id: '',
+        nom_equipement: '',
+        model_equipement: '',
+        numero_serie: '',
+      }));
+      return;
+    }
+
+    if (formData.parc_item_id) return;
+
+    const selectedType = (formData.type_equipement || '').trim().toLowerCase();
+    const firstItem = sourceItems.find(
+      (item) => ((item.type_equipement || '').trim().toLowerCase() === selectedType)
+    );
+    if (!firstItem) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      parc_item_id: String(firstItem.id),
+      nom_equipement: firstItem.nom_equipement || '',
+      type_equipement: firstItem.type_equipement || prev.type_equipement,
+      model_equipement: firstItem.model_equipement || '',
+      numero_serie: firstItem.numero_serie || '',
+      quantite: 1,
+    }));
+  }, [showForm, formData.type_mouvement, formData.source_entree, formData.type_equipement, formData.parc_item_id, sourceItems, sourceLoading]);
+
+  useEffect(() => {
+    const isSortie = formData.type_mouvement === 'Sortie';
+    const isEntreeParc = formData.type_mouvement === 'Entrée' && formData.source_entree === 'parc';
+    const hasType = !!formData.type_equipement;
+
+    if (!hasType || (!isSortie && !isEntreeParc)) {
+      setSourceItems([]);
+      setSourceLoading(false);
+      return;
+    }
+
+    let isCancelled = false;
+
+    const loadSources = async () => {
+      try {
+        setSourceLoading(true);
+        const res = isSortie
+          ? await mouvementsAPI.getStockSources(formData.type_equipement, sourceSearch)
+          : await mouvementsAPI.getParcSources(formData.type_equipement, sourceSearch);
+
+        if (!isCancelled) {
+          setSourceItems(res.data || []);
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          setSourceItems([]);
+        }
+      } finally {
+        if (!isCancelled) {
+          setSourceLoading(false);
+        }
+      }
+    };
+
+    loadSources();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [formData.type_mouvement, formData.source_entree, formData.type_equipement, sourceSearch]);
+
+  const handleMouvementTypeChange = (value) => {
+    setFormData({
+      ...getEmptyForm(),
+      type_mouvement: value,
+      source_entree: value === 'Entrée' ? 'achat' : '',
+      activite: value === 'Sortie' ? 'Transfert vers parc' : '',
+    });
+    setSourceSearch('');
+    setSourceItems([]);
+  };
+
+  const handleSourceEntreeChange = (value) => {
+    setFormData((prev) => ({
+      ...prev,
+      source_entree: value,
+      parc_item_id: '',
+      stock_item_id: '',
+      nom_equipement: '',
+      model_equipement: '',
+      numero_serie: '',
+      quantite: value === 'parc' ? 1 : 1,
+      activite: '',
+      type_stock: value === 'parc' ? 'Commun' : prev.type_stock,
+      date_affectation: value === 'parc' ? getTodayDateInput() : prev.date_affectation,
+    }));
+    setSourceSearch('');
+    setSourceItems([]);
+  };
+
+  const handleTypeEquipementChange = (value) => {
+    setFormData((prev) => ({
+      ...prev,
+      type_equipement: value,
+      stock_item_id: '',
+      parc_item_id: '',
+      nom_equipement: prev.type_mouvement === 'Sortie' || prev.source_entree === 'parc' ? '' : prev.nom_equipement,
+      model_equipement: prev.type_mouvement === 'Sortie' || prev.source_entree === 'parc' ? '' : prev.model_equipement,
+      numero_serie: prev.type_mouvement === 'Sortie' || prev.source_entree === 'parc' ? '' : prev.numero_serie,
+      quantite: prev.source_entree === 'parc' ? 1 : prev.quantite,
+      activite: prev.type_mouvement === 'Sortie' ? 'Transfert vers parc' : prev.activite,
+    }));
+    setSourceItems([]);
+    setSourceSearch('');
+  };
+
+  const handleSelectStockItem = (stockItemId) => {
+    const selected = sourceItems.find((item) => String(item.id) === String(stockItemId));
+    setFormData((prev) => ({
+      ...prev,
+      stock_item_id: stockItemId,
+      nom_equipement: selected?.nom_equipement || '',
+      type_equipement: selected?.type_equipement || prev.type_equipement,
+      model_equipement: selected?.model_equipement || '',
+      numero_serie: selected?.numero_serie || '',
+      type_stock: selected?.type_stock || '',
+      quantite: 1,
+      activite: 'Transfert vers parc',
+    }));
+  };
+
+  const handleSelectParcItem = (parcItemId) => {
+    const selected = sourceItems.find((item) => String(item.id) === String(parcItemId));
+    setFormData((prev) => ({
+      ...prev,
+      parc_item_id: parcItemId,
+      nom_equipement: selected?.nom_equipement || '',
+      type_equipement: selected?.type_equipement || prev.type_equipement,
+      model_equipement: selected?.model_equipement || '',
+      numero_serie: selected?.numero_serie || '',
+      quantite: 1,
+      type_stock: prev.type_stock || 'Commun',
+      date_affectation: prev.date_affectation || getTodayDateInput(),
+    }));
+  };
+
   const isEntree = formData.type_mouvement === 'Entrée';
+  const isSortie = formData.type_mouvement === 'Sortie';
+  const isEntreeAchat = isEntree && formData.source_entree === 'achat';
+  const isEntreeParc = isEntree && formData.source_entree === 'parc';
+  const selectedStockItem = sourceItems.find((item) => String(item.id) === String(formData.stock_item_id));
+  const selectedParcItem = sourceItems.find((item) => String(item.id) === String(formData.parc_item_id));
 
   return (
     <div className="p-6 space-y-4">
@@ -176,7 +415,7 @@ export default function Mouvements() {
             <div className="grid grid-cols-2 gap-4">
               <select
                 value={formData.type_mouvement}
-                onChange={(e) => setFormData({ ...formData, type_mouvement: e.target.value })}
+                onChange={(e) => handleMouvementTypeChange(e.target.value)}
                 className="p-2 border rounded"
                 required
               >
@@ -185,26 +424,89 @@ export default function Mouvements() {
                 ))}
               </select>
 
-              <input
-                type="text"
-                placeholder="Nom équipement"
-                value={formData.nom_equipement}
-                onChange={(e) => setFormData({ ...formData, nom_equipement: e.target.value })}
-                className="p-2 border rounded"
-                required
-              />
+              {isEntree ? (
+                <select
+                  value={formData.source_entree}
+                  onChange={(e) => handleSourceEntreeChange(e.target.value)}
+                  className="p-2 border rounded"
+                  required
+                >
+                  <option value="achat">Entrée depuis Achat</option>
+                  <option value="parc">Entrée depuis Parc</option>
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value="Sortie depuis Stock vers Parc"
+                  className="p-2 border rounded bg-gray-50 text-gray-600"
+                  disabled
+                />
+              )}
 
               <select
                 value={formData.type_equipement}
-                onChange={(e) => setFormData({ ...formData, type_equipement: e.target.value })}
+                onChange={(e) => handleTypeEquipementChange(e.target.value)}
                 className="p-2 border rounded"
                 required
               >
                 <option value="">Sélectionner type équipement</option>
-                {equipmentTypes.map(type => (
+                {(isSortie ? availableStockTypes : (isEntreeParc ? availableParcTypes : equipmentTypes)).map(type => (
                   <option key={type} value={type}>{type}</option>
                 ))}
               </select>
+
+              {isEntreeParc && (
+                <input
+                  type="text"
+                  placeholder="Rechercher dans la liste..."
+                  value={sourceSearch}
+                  onChange={(e) => setSourceSearch(e.target.value)}
+                  className="p-2 border rounded"
+                />
+              )}
+
+              {isSortie && (
+                <select
+                  value={formData.stock_item_id}
+                  onChange={(e) => handleSelectStockItem(e.target.value)}
+                  className="p-2 border rounded"
+                  required
+                >
+                  <option value="">Choisir un équipement du stock</option>
+                  {sourceItems.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.nom_equipement} - {item.type_equipement} - {item.type_stock} - Qte {item.quantite}{item.numero_serie ? ` - SN ${item.numero_serie}` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              {isEntreeParc && (
+                <select
+                  value={formData.parc_item_id}
+                  onChange={(e) => handleSelectParcItem(e.target.value)}
+                  className="p-2 border rounded"
+                  required
+                >
+                  <option value="">Choisir un équipement du parc</option>
+                  {sourceItems.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.nom_equipement}{item.numero_serie ? ` - ${item.numero_serie}` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              {isEntreeAchat && (
+                <input
+                  type="text"
+                  placeholder="Nom équipement"
+                  value={formData.nom_equipement}
+                  onChange={(e) => setFormData({ ...formData, nom_equipement: e.target.value })}
+                  className="p-2 border rounded"
+                  required
+                />
+              )}
 
               <input
                 type="text"
@@ -212,6 +514,8 @@ export default function Mouvements() {
                 value={formData.model_equipement}
                 onChange={(e) => setFormData({ ...formData, model_equipement: e.target.value })}
                 className="p-2 border rounded"
+                disabled={isSortie || isEntreeParc}
+                hidden={isSortie || isEntreeParc}
               />
 
               <input
@@ -220,6 +524,8 @@ export default function Mouvements() {
                 value={formData.numero_serie}
                 onChange={(e) => setFormData({ ...formData, numero_serie: e.target.value })}
                 className="p-2 border rounded"
+                disabled={isSortie || isEntreeParc}
+                hidden={isSortie || isEntreeParc}
               />
 
               <input
@@ -228,38 +534,43 @@ export default function Mouvements() {
                 value={formData.quantite}
                 onChange={(e) => setFormData({ ...formData, quantite: parseInt(e.target.value || '0', 10) })}
                 className="p-2 border rounded"
+                min="1"
+                max={isSortie && selectedStockItem ? selectedStockItem.quantite : undefined}
                 required
+                disabled={isEntreeParc || isSortie}
+                hidden={isSortie || isEntreeParc}
               />
 
-              <select
-                value={formData.type_stock}
-                onChange={(e) => setFormData({ ...formData, type_stock: e.target.value })}
-                className="p-2 border rounded"
-                required
-              >
-                <option value="">Sélectionner type stock</option>
-                {typeStocks.map(type => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
-              </select>
+              {(isSortie || isEntreeParc) ? (
+                <input
+                  type="text"
+                  value={formData.type_stock ? `Type stock: ${formData.type_stock}` : 'Type stock auto'}
+                  className="p-2 border rounded bg-gray-50 text-gray-600"
+                  disabled
+                />
+              ) : (
+                <select
+                  value={formData.type_stock}
+                  onChange={(e) => setFormData({ ...formData, type_stock: e.target.value })}
+                  className="p-2 border rounded"
+                  required
+                >
+                  <option value="">Sélectionner type stock</option>
+                  {typeStocks.map(type => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              )}
 
               {isEntree ? (
                 <>
-                  <select
-                    value={formData.source_entree}
-                    onChange={(e) => setFormData({ ...formData, source_entree: e.target.value })}
-                    className="p-2 border rounded"
-                    required
-                  >
-                    <option value="achat">Achat</option>
-                    <option value="parc">Parc</option>
-                  </select>
                   <input
                     type="date"
                     value={formData.date_affectation}
                     onChange={(e) => setFormData({ ...formData, date_affectation: e.target.value })}
                     className="p-2 border rounded"
-                    required
+                    disabled={isEntreeParc}
+                    hidden={isEntreeParc}
                   />
                 </>
               ) : (
@@ -269,21 +580,61 @@ export default function Mouvements() {
                     placeholder="Activité"
                     value={formData.activite}
                     onChange={(e) => setFormData({ ...formData, activite: e.target.value })}
-                    className="p-2 border rounded"
+                    className="p-2 border rounded bg-gray-50 text-gray-600"
                     required
+                    disabled
+                    hidden={isSortie}
                   />
-                  <div />
+                  {!isSortie && <div />}
                 </>
               )}
             </div>
 
-            <textarea
-              placeholder="Description du mouvement"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full p-2 border rounded"
-              rows="3"
-            />
+            {(isSortie || isEntreeParc) && (
+              <div className="text-sm text-slate-500">
+                {sourceLoading
+                  ? 'Chargement des équipements...'
+                  : `Résultats trouvés: ${sourceItems.length}`}
+              </div>
+            )}
+
+            {isSortie && selectedStockItem && (
+              <div className="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-slate-700">
+                <p className="font-semibold text-sky-800">Données récupérées depuis le Stock</p>
+                <div className="mt-2 grid gap-2 md:grid-cols-2">
+                  <p><span className="font-medium">Nom:</span> {selectedStockItem.nom_equipement || '-'}</p>
+                  <p><span className="font-medium">Type:</span> {selectedStockItem.type_equipement || '-'}</p>
+                  <p><span className="font-medium">Type stock:</span> {selectedStockItem.type_stock || '-'}</p>
+                  <p><span className="font-medium">Quantité dispo:</span> {selectedStockItem.quantite ?? 0}</p>
+                  <p><span className="font-medium">Model:</span> {selectedStockItem.model_equipement || '-'}</p>
+                  <p><span className="font-medium">N° série:</span> {selectedStockItem.numero_serie || '-'}</p>
+                </div>
+              </div>
+            )}
+
+            {isEntreeParc && selectedParcItem && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-slate-700">
+                <p className="font-semibold text-emerald-800">Données récupérées depuis le Parc</p>
+                <div className="mt-2 grid gap-2 md:grid-cols-2">
+                  <p><span className="font-medium">Nom:</span> {selectedParcItem.nom_equipement || '-'}</p>
+                  <p><span className="font-medium">Type:</span> {selectedParcItem.type_equipement || '-'}</p>
+                  <p><span className="font-medium">Model:</span> {selectedParcItem.model_equipement || '-'}</p>
+                  <p><span className="font-medium">N° série:</span> {selectedParcItem.numero_serie || '-'}</p>
+                  <p><span className="font-medium">Type stock destination:</span> {formData.type_stock || 'Commun'}</p>
+                  <p><span className="font-medium">Date:</span> {formData.date_affectation || getTodayDateInput()}</p>
+                </div>
+              </div>
+            )}
+
+            {!isSortie && !isEntreeParc && (
+              <textarea
+                placeholder="Description du mouvement"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="w-full p-2 border rounded"
+                rows="3"
+              />
+            )}
 
             <div className="flex gap-2 justify-end">
               <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 bg-gray-300 rounded">Annuler</button>

@@ -6,11 +6,20 @@ from datetime import datetime
 
 utilisateurs_bp = Blueprint('utilisateurs', __name__, url_prefix='/api/utilisateurs')
 
+
+def _get_current_user_id():
+    try:
+        return int(get_jwt_identity())
+    except (TypeError, ValueError):
+        return None
+
 # GET all users (admin only)
 @utilisateurs_bp.route('/', methods=['GET'])
 @jwt_required()
 def get_utilisateurs():
-    current_user_id = get_jwt_identity()
+    current_user_id = _get_current_user_id()
+    if current_user_id is None:
+        return jsonify({'message': 'Token invalide'}), 401
     current_user = Utilisateur.query.get(current_user_id)
 
     if not current_user or current_user.role != 'admin':
@@ -23,7 +32,9 @@ def get_utilisateurs():
 @utilisateurs_bp.route('/<int:id>', methods=['GET'])
 @jwt_required()
 def get_utilisateur(id):
-    current_user_id = get_jwt_identity()
+    current_user_id = _get_current_user_id()
+    if current_user_id is None:
+        return jsonify({'message': 'Token invalide'}), 401
     user = Utilisateur.query.get_or_404(id)
 
     # Users can only view their own profile, admins can view anyone
@@ -38,7 +49,9 @@ def get_utilisateur(id):
 @utilisateurs_bp.route('/', methods=['POST'])
 @jwt_required()
 def create_utilisateur():
-    current_user_id = get_jwt_identity()
+    current_user_id = _get_current_user_id()
+    if current_user_id is None:
+        return jsonify({'message': 'Token invalide'}), 401
     current_user = Utilisateur.query.get(current_user_id)
 
     if not current_user or current_user.role != 'admin':
@@ -77,7 +90,9 @@ def create_utilisateur():
 @utilisateurs_bp.route('/<int:id>', methods=['PUT'])
 @jwt_required()
 def update_utilisateur(id):
-    current_user_id = get_jwt_identity()
+    current_user_id = _get_current_user_id()
+    if current_user_id is None:
+        return jsonify({'message': 'Token invalide'}), 401
     current_user = Utilisateur.query.get(current_user_id)
 
     if not current_user or current_user.role != 'admin':
@@ -110,7 +125,9 @@ def update_utilisateur(id):
 @utilisateurs_bp.route('/<int:id>', methods=['DELETE'])
 @jwt_required()
 def delete_utilisateur(id):
-    current_user_id = get_jwt_identity()
+    current_user_id = _get_current_user_id()
+    if current_user_id is None:
+        return jsonify({'message': 'Token invalide'}), 401
     current_user = Utilisateur.query.get(current_user_id)
 
     if not current_user or current_user.role != 'admin':
@@ -134,7 +151,9 @@ def delete_utilisateur(id):
 @utilisateurs_bp.route('/<int:id>/permissions', methods=['PUT'])
 @jwt_required()
 def update_permissions(id):
-    current_user_id = get_jwt_identity()
+    current_user_id = _get_current_user_id()
+    if current_user_id is None:
+        return jsonify({'message': 'Token invalide'}), 401
     current_user = Utilisateur.query.get(current_user_id)
 
     if not current_user or current_user.role != 'admin':

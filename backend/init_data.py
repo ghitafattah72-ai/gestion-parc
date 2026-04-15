@@ -19,11 +19,11 @@ def init_default_data():
         try:
             # Créer les locaux IT par défaut
             default_locaux = [
-                {'nom': 'CIM2', 'description': 'Local informatique CIM2', 'localisation': 'Bâtiment principal'},
-                {'nom': 'CIM6', 'description': 'Local informatique CIM6', 'localisation': 'Bâtiment principal'},
-                {'nom': 'CIM7', 'description': 'Local informatique CIM7', 'localisation': 'Bâtiment principal'},
-                {'nom': 'CIM4H1', 'description': 'Local informatique CIM4H1', 'localisation': 'Bâtiment principal'},
-                {'nom': 'CIM4H2', 'description': 'Local informatique CIM4H2', 'localisation': 'Bâtiment principal'}
+                {'nom': 'CIM2'},
+                {'nom': 'CIM6'},
+                {'nom': 'CIM7'},
+                {'nom': 'CIM4H1'},
+                {'nom': 'CIM4H2'}
             ]
 
             locaux_created = 0

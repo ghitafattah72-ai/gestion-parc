@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from models import db, LocalIT, BaieIT
+from models import db, LocalIT, BaieIT, MaterielIT
 from datetime import datetime
 
 locaux_it_bp = Blueprint('locaux_it', __name__, url_prefix='/api/locaux-it')
@@ -24,7 +24,6 @@ def create_local_it():
     try:
         new_item = LocalIT(
             nom=data.get('nom'),
-            description=data.get('description'),
             localisation=data.get('localisation')
         )
         
@@ -47,7 +46,6 @@ def update_local_it(id):
     
     try:
         item.nom = data.get('nom', item.nom)
-        item.description = data.get('description', item.description)
         item.localisation = data.get('localisation', item.localisation)
         item.date_modification = datetime.utcnow()
         
@@ -79,11 +77,11 @@ def delete_local_it(id):
 def init_default_locaux():
     try:
         default_locaux = [
-            {'nom': 'CIM2', 'description': 'Local informatique CIM2', 'localisation': 'bâtiment'},
-            {'nom': 'CIM6', 'description': 'Local informatique CIM6', 'localisation': 'bâtiment'},
-            {'nom': 'CIM7', 'description': 'Local informatique CIM7', 'localisation': 'bâtiment'},
-            {'nom': 'CIM4H1', 'description': 'Local informatique CIM4H1', 'localisation': 'bâtiment'},
-            {'nom': 'CIM4H2', 'description': 'Local informatique CIM4H2', 'localisation': 'bâtiment'}
+            {'nom': 'CIM2'},
+            {'nom': 'CIM6'},
+            {'nom': 'CIM7'},
+            {'nom': 'CIM4H1'},
+            {'nom': 'CIM4H2'}
         ]
         
         created = 0
@@ -220,7 +218,6 @@ def local_to_dict(item):
     return {
         'id': item.id,
         'nom': item.nom,
-        'description': item.description,
         'localisation': item.localisation,
         'date_creation': item.date_creation.isoformat(),
         'date_modification': item.date_modification.isoformat()
@@ -230,9 +227,9 @@ def local_to_dict_with_baies(item):
     return {
         'id': item.id,
         'nom': item.nom,
-        'description': item.description,
         'localisation': item.localisation,
-        'baies': [baie_to_dict(b) for b in item.baies],
+        'baies': [baie_to_dict_with_materiels(b) for b in item.baies],
+        'materiels': [materiel_to_dict(m) for m in MaterielIT.query.filter_by(local_it_id=item.id, baie_id=None).all()],
         'date_creation': item.date_creation.isoformat(),
         'date_modification': item.date_modification.isoformat()
     }
@@ -247,3 +244,72 @@ def baie_to_dict(item):
         'date_creation': item.date_creation.isoformat(),
         'date_modification': item.date_modification.isoformat()
     }
+
+def baie_to_dict_with_materiels(item):
+    return {
+        'id': item.id,
+        'nom': item.nom,
+        'numero': item.numero,
+        'local_it_id': item.local_it_id,
+        'description': item.description,
+        'materiels': [materiel_to_dict(m) for m in MaterielIT.query.filter_by(baie_id=item.id).all()],
+        'date_creation': item.date_creation.isoformat(),
+        'date_modification': item.date_modification.isoformat()
+    }
+
+def materiel_to_dict(item):
+    return {
+        'id': item.id,
+        'type_materiel': item.type_materiel,
+        'nom': item.nom,
+        'modele': item.modele,
+        'version': item.version,
+        'os_firmware': item.os_firmware,
+        'numero_serie': item.numero_serie,
+        'stack_role': item.stack_role,
+        'stack_ip': item.stack_ip,
+        'description': item.description,
+        'baie_id': item.baie_id,
+        'local_it_id': item.local_it_id,
+        'date_creation': item.date_creation.isoformat(),
+        'date_modification': item.date_modification.isoformat()
+    }
+
+
+# ========== MATERIEL IT ROUTES ==========
+
+@locaux_it_bp.route('/materiels', methods=['POST'])
+def create_materiel():
+    data = request.json
+    try:
+        new_m = MaterielIT(
+            type_materiel=data.get('type_materiel'),
+            nom=data.get('nom'),
+            modele=data.get('modele'),
+            version=data.get('version'),
+            os_firmware=data.get('os_firmware'),
+            numero_serie=data.get('numero_serie'),
+            stack_role=data.get('stack_role'),
+            stack_ip=data.get('stack_ip'),
+            description=data.get('description'),
+            baie_id=data.get('baie_id') or None,
+            local_it_id=data.get('local_it_id') or None,
+        )
+        db.session.add(new_m)
+        db.session.commit()
+        return jsonify({'message': 'Matériel ajouté', 'materiel': materiel_to_dict(new_m)}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+
+@locaux_it_bp.route('/materiels/<int:id>', methods=['DELETE'])
+def delete_materiel(id):
+    item = MaterielIT.query.get_or_404(id)
+    try:
+        db.session.delete(item)
+        db.session.commit()
+        return jsonify({'message': 'Matériel supprimé'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400

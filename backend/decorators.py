@@ -16,7 +16,10 @@ def check_permission(permission_name):
         @wraps(fn)
         @jwt_required()
         def wrapper(*args, **kwargs):
-            current_user_id = get_jwt_identity()
+            try:
+                current_user_id = int(get_jwt_identity())
+            except (TypeError, ValueError):
+                return jsonify({'message': 'Token invalide'}), 401
             current_user = Utilisateur.query.get(current_user_id)
             
             if not current_user:

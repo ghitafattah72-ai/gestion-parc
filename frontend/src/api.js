@@ -25,8 +25,16 @@ export const stockAPI = {
     api.get('/stock/', { params: { page, per_page, type_stock, search } }),
   getById: (id) => api.get(`/stock/${id}`),
   create: (data) => api.post('/stock/', data),
+  update: (id, data) => api.put(`/stock/${id}`, data),
   delete: (id) => api.delete(`/stock/${id}`),
   getStats: () => api.get('/stock/stats'),
+  import: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/stock/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
   export: (format = 'csv', type_stock = null) => 
     api.get('/stock/export', { params: { format, type_stock }, responseType: 'blob' }),
 };
@@ -35,6 +43,10 @@ export const stockAPI = {
 export const mouvementsAPI = {
   getAll: (page = 1, per_page = 10, type_mouvement = null, search = '') =>
     api.get('/mouvements/', { params: { page, per_page, type_mouvement, search } }),
+  getStockSources: (type_equipement, search = '') =>
+    api.get('/mouvements/sources/stock', { params: { type_equipement, search } }),
+  getParcSources: (type_equipement, search = '') =>
+    api.get('/mouvements/sources/parc', { params: { type_equipement, search } }),
   getHistorique: () => api.get('/mouvements/historique'),
   getById: (id) => api.get(`/mouvements/${id}`),
   create: (data) => api.post('/mouvements/', data),
@@ -80,6 +92,10 @@ export const locauxITAPI = {
   createBaie: (localId, data) => api.post(`/locaux-it/${localId}/baies`, data),
   updateBaie: (id, data) => api.put(`/locaux-it/baies/${id}`, data),
   deleteBaie: (id) => api.delete(`/locaux-it/baies/${id}`),
+
+  // Matériels IT (réseau)
+  createMateriel: (data) => api.post('/locaux-it/materiels', data),
+  deleteMateriel: (id) => api.delete(`/locaux-it/materiels/${id}`),
 };
 
 // Utilisateurs API

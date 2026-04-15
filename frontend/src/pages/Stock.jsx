@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { stockAPI } from '../api';
-import { Plus, Trash2, Download, Search } from 'lucide-react';
+import { Plus, Trash2, Download, Search, Pencil, Upload } from 'lucide-react';
 import { RestrictedButton } from '../components/ProtectedRoute';
+import { useAuth } from '../context/AuthContext';
 import { handleExportFile } from '../utils/fileExport';
 import { EQUIPMENT_TYPES_WITH_DETAILS, STOCK_TYPES } from '../constants';
 
 const equipmentTypes = [
-  'pc portable', 'pc fixe', 'imprimante', 'étiquette', 'imprimante A4',
+  'pc portable', 'pc fixe', 'ipo', 'imprimante', 'étiquette', 'imprimante A4',
   'imprimante location', 'imprimante traceur', 'écran', 'câble', 'souris filaire',
   'clavier filaire', 'souris sans fil', 'clavier et souris filaire', 'douchettes', 'casque', 'autre'
 ];
@@ -15,6 +16,7 @@ const typeStocks = ['FSS', 'IMS', 'C2S', 'Commun'];
 const states = ['nouveau', 'occasion bon état', 'occasion mauvaise état', 'en panne'];
 
 export default function Stock() {
+  const { hasPermission } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -22,6 +24,7 @@ export default function Stock() {
   const [typeStockFilter, setTypeStockFilter] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [editingId, setEditingId] = useState(null);
 
   const [formData, setFormData] = useState({
     nom_equipement: '',
@@ -56,7 +59,25 @@ export default function Stock() {
     }
   };
 
-  const handleAddItem = async (e) => {
+  const resetForm = () => {
+    setFormData({
+      nom_equipement: '',
+      type_equipement: '',
+      quantite: 0,
+      type_stock: '',
+      etat: 'nouveau',
+      ram: '',
+      stockage: '',
+      processeur: '',
+      numero_serie: '',
+      activite: '',
+      systeme: '',
+      accessoires: '',
+    });
+    setEditingId(null);
+  };
+
+  const handleSaveItem = async (e) => {
     e.preventDefault();
     
     if (!formData.nom_equipement || !formData.type_equipement || !formData.type_stock) {
@@ -65,28 +86,39 @@ export default function Stock() {
     }
 
     try {
-      await stockAPI.create(formData);
-      alert('Équipement ajouté avec succès');
-      setFormData({
-        nom_equipement: '',
-        type_equipement: '',
-        quantite: 0,
-        type_stock: '',
-        etat: 'nouveau',
-        ram: '',
-        stockage: '',
-        processeur: '',
-        numero_serie: '',
-        activite: '',
-        systeme: '',
-        accessoires: '',
-      });
+      if (editingId) {
+        await stockAPI.update(editingId, formData);
+        alert('Équipement modifié avec succès');
+      } else {
+        await stockAPI.create(formData);
+        alert('Équipement ajouté avec succès');
+      }
+      resetForm();
       setShowForm(false);
       loadStock();
     } catch (error) {
-      console.error('Erreur lors de l\'ajout:', error);
-      alert('Erreur lors de l\'ajout de l\'équipement');
+      console.error('Erreur lors de l\'enregistrement:', error);
+      alert('Erreur lors de l\'enregistrement de l\'équipement');
     }
+  };
+
+  const handleEdit = (item) => {
+    setFormData({
+      nom_equipement: item.nom_equipement || '',
+      type_equipement: item.type_equipement || '',
+      quantite: item.quantite ?? 0,
+      type_stock: item.type_stock || '',
+      etat: item.etat || 'nouveau',
+      ram: item.ram || '',
+      stockage: item.stockage || '',
+      processeur: item.processeur || '',
+      numero_serie: item.numero_serie || '',
+      activite: item.activite || '',
+      systeme: item.systeme || '',
+      accessoires: item.accessoires || '',
+    });
+    setEditingId(item.id);
+    setShowForm(true);
   };
 
   const handleDelete = async (id) => {
@@ -105,17 +137,32 @@ export default function Stock() {
   const handleExport = async (format) => {
     try {
       await handleExportFile(
-        (fmt, params) => stockAPI.export(fmt, params),
+        (fmt) => stockAPI.export(fmt, typeStockFilter || null),
         format,
-        'stock',
-        typeStockFilter || undefined
+        'stock'
       );
     } catch (error) {
       alert(error.message);
     }
   };
 
-  const isPCType = ['pc portable', 'pc fixe'].includes(formData.type_equipement);
+  const handleImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      const res = await stockAPI.import(file);
+      alert(`${res.data.imported_count} équipements importés`);
+      e.target.value = '';
+      setPage(1);
+      loadStock();
+    } catch (error) {
+      console.error('Erreur lors de l\'import:', error);
+      alert(error?.response?.data?.error || 'Erreur lors de l\'import');
+    }
+  };
+
+  const isPCType = ['pc portable', 'pc fixe', 'ipo'].includes(formData.type_equipement);
 
   return (
     <div className="space-y-6">
@@ -126,18 +173,34 @@ export default function Stock() {
             <p className="mt-2 text-slate-200 max-w-2xl">Visualisez et gérez l’inventaire central de vos équipements IT avec un accès rapide aux exports et à l’ajout.</p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <button
+            <label
+              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white transition ${
+                hasPermission('import') ? 'bg-violet-500 hover:bg-violet-600 cursor-pointer' : 'bg-gray-300 cursor-not-allowed'
+              }`}
+            >
+              <Upload size={18} /> Import
+              <input
+                type="file"
+                onChange={handleImport}
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                disabled={!hasPermission('import')}
+              />
+            </label>
+            <RestrictedButton
               onClick={() => handleExport('csv')}
+              requiredAction="export"
               className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
             >
               <Download size={18} /> CSV
-            </button>
-            <button
+            </RestrictedButton>
+            <RestrictedButton
               onClick={() => handleExport('xlsx')}
+              requiredAction="export"
               className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
             >
               <Download size={18} /> Excel
-            </button>
+            </RestrictedButton>
             <RestrictedButton
               onClick={() => setShowForm(!showForm)}
               requiredAction="edit"
@@ -184,8 +247,8 @@ export default function Stock() {
       {/* Form */}
       {showForm && (
         <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-xl font-bold mb-4">Ajouter un nouvel équipement</h3>
-          <form onSubmit={handleAddItem} className="space-y-4">
+          <h3 className="text-xl font-bold mb-4">{editingId ? 'Modifier l\'équipement' : 'Ajouter un nouvel équipement'}</h3>
+          <form onSubmit={handleSaveItem} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <input
                 type="text"
@@ -294,8 +357,19 @@ export default function Stock() {
             )}
 
             <div className="flex gap-2 justify-end">
-              <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 bg-gray-300 rounded">Annuler</button>
-              <button type="submit" className="px-4 py-2 bg-blue-500 text-white rounded">Ajouter</button>
+              <button
+                type="button"
+                onClick={() => {
+                  resetForm();
+                  setShowForm(false);
+                }}
+                className="px-4 py-2 bg-gray-300 rounded"
+              >
+                Annuler
+              </button>
+              <button type="submit" className="px-4 py-2 bg-blue-500 text-white rounded">
+                {editingId ? 'Modifier' : 'Ajouter'}
+              </button>
             </div>
           </form>
         </div>
@@ -336,6 +410,13 @@ export default function Stock() {
                     </span>
                   </td>
                   <td className="p-3">
+                    <RestrictedButton
+                      onClick={() => handleEdit(item)}
+                      requiredAction="edit"
+                      className="text-blue-500 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed mr-3"
+                    >
+                      <Pencil size={18} />
+                    </RestrictedButton>
                     <RestrictedButton
                       onClick={() => handleDelete(item.id)}
                       requiredAction="edit"

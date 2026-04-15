@@ -3,7 +3,7 @@ from flask import Blueprint, jsonify, request
 
 from decorators import check_permission
 from export_utils import export_to_csv, export_to_excel, get_export_filename
-from models import db, Mouvement, MouvementHistorique, Stock
+from models import db, Mouvement, MouvementHistorique, Stock, Parc
 
 mouvements_bp = Blueprint('mouvements', __name__, url_prefix='/api/mouvements')
 
@@ -26,6 +26,13 @@ def _parse_affectation_date(date_value):
 def _to_positive_int(raw_value):
     value = int(raw_value)
     return value if value > 0 else None
+
+
+def _to_int(raw_value):
+    try:
+        return int(raw_value)
+    except (TypeError, ValueError):
+        return None
 
 # GET all movements
 @mouvements_bp.route('/', methods=['GET'])
@@ -60,6 +67,88 @@ def get_mouvement(id):
     item = Mouvement.query.get_or_404(id)
     return jsonify(mouvement_to_dict(item))
 
+
+@mouvements_bp.route('/sources/stock', methods=['GET'])
+def get_stock_sources():
+    type_equipement = (request.args.get('type_equipement') or '').strip().lower()
+    if type_equipement in ['undefined', 'null', 'none']:
+        type_equipement = ''
+    search = (request.args.get('search') or '').strip()
+
+    query = Stock.query.filter(Stock.quantite > 0)
+
+    if type_equipement:
+        query = query.filter(db.func.lower(Stock.type_equipement) == type_equipement)
+
+    if search:
+        term = f'%{search}%'
+        query = query.filter(
+            Stock.nom_equipement.ilike(term)
+            | Stock.numero_serie.ilike(term)
+            | Stock.type_stock.ilike(term)
+            | Stock.type_equipement.ilike(term)
+        )
+
+    items = query.order_by(Stock.nom_equipement.asc(), Stock.type_stock.asc()).all()
+
+    return jsonify([
+        {
+            'id': item.id,
+            'nom_equipement': item.nom_equipement,
+            'type_equipement': item.type_equipement,
+            'type_stock': item.type_stock,
+            'quantite': item.quantite,
+            'model_equipement': item.stockage,
+            'numero_serie': item.numero_serie,
+            'ram': item.ram,
+            'processeur': item.processeur,
+            'systeme': item.systeme,
+            'accessoires': item.accessoires,
+            'activite': item.activite,
+        }
+        for item in items
+    ])
+
+
+@mouvements_bp.route('/sources/parc', methods=['GET'])
+def get_parc_sources():
+    type_equipement = (request.args.get('type_equipement') or '').strip().lower()
+    if type_equipement in ['undefined', 'null', 'none']:
+        type_equipement = ''
+    search = (request.args.get('search') or '').strip()
+
+    query = Parc.query
+
+    if type_equipement:
+        query = query.filter(db.func.lower(Parc.type) == type_equipement)
+
+    if search:
+        term = f'%{search}%'
+        query = query.filter(
+            Parc.name.ilike(term)
+            | Parc.numero_serie.ilike(term)
+            | Parc.model.ilike(term)
+            | Parc.type.ilike(term)
+        )
+
+    items = query.order_by(Parc.name.asc()).all()
+
+    return jsonify([
+        {
+            'id': item.id,
+            'nom_equipement': item.name,
+            'type_equipement': item.type,
+            'model_equipement': item.model,
+            'numero_serie': item.numero_serie,
+            'ram': item.ram,
+            'processeur': item.processeur,
+            'systeme': item.os_name,
+            'accessoires': None,
+            'activite': item.esu,
+        }
+        for item in items
+    ])
+
 # POST new movement (Transfer from stock to local IT)
 @mouvements_bp.route('/', methods=['POST'])
 def create_mouvement():
@@ -78,12 +167,16 @@ def create_mouvement():
         numero_serie = (data.get('numero_serie') or '').strip()
         activite = (data.get('activite') or '').strip()
         description = (data.get('description') or '').strip()
+        stock_item_id = _to_int(data.get('stock_item_id'))
+        parc_item_id = _to_int(data.get('parc_item_id'))
 
-        if not nom_equipement or not type_equipement or not type_stock or not quantite:
-            return jsonify({'error': 'Veuillez remplir nom, type matériel, quantité et type stock'}), 400
+        if not quantite:
+            return jsonify({'error': 'Quantité invalide'}), 400
 
         source_entree = None
         date_mouvement = datetime.utcnow()
+        stock_item = None
+        parc_item = None
 
         if type_mouvement == 'entrée':
             source_entree = (data.get('source_entree') or '').strip().lower()
@@ -96,12 +189,57 @@ def create_mouvement():
             except ValueError:
                 return jsonify({'error': 'Date affectation invalide (format YYYY-MM-DD)'}), 400
 
-            if not parsed_date:
-                return jsonify({'error': 'Date affectation obligatoire pour une entrée'}), 400
-            date_mouvement = parsed_date
+            date_mouvement = parsed_date or datetime.utcnow()
+
+            if source_entree == 'parc':
+                if quantite != 1:
+                    return jsonify({'error': 'Entrée depuis parc supporte uniquement quantité = 1'}), 400
+                if not parc_item_id:
+                    return jsonify({'error': 'Sélectionnez un équipement parc'}), 400
+
+                parc_item = Parc.query.get(parc_item_id)
+                if not parc_item:
+                    return jsonify({'error': 'Équipement parc introuvable'}), 404
+
+                nom_equipement = parc_item.name
+                type_equipement = parc_item.type
+                model_equipement = parc_item.model or ''
+                numero_serie = parc_item.numero_serie or ''
+
+                if not type_stock:
+                    return jsonify({'error': 'Type stock destination obligatoire'}), 400
+
+            if source_entree == 'achat':
+                if not nom_equipement or not type_equipement or not type_stock:
+                    return jsonify({'error': 'Pour achat, nom, type matériel et type stock sont obligatoires'}), 400
 
         if type_mouvement == 'sortie' and not activite:
             return jsonify({'error': 'Activité obligatoire pour une sortie'}), 400
+
+        if type_mouvement == 'sortie':
+            if stock_item_id:
+                stock_item = Stock.query.get(stock_item_id)
+            else:
+                if not nom_equipement or not type_stock:
+                    return jsonify({'error': 'Sélectionnez un équipement stock pour la sortie'}), 400
+                stock_item = Stock.query.filter_by(
+                    nom_equipement=nom_equipement,
+                    type_stock=type_stock,
+                ).first()
+
+            if not stock_item:
+                return jsonify({'error': 'Aucun stock trouvé pour cette sortie'}), 400
+            if stock_item.quantite < quantite:
+                return jsonify({'error': 'Quantité insuffisante dans le stock'}), 400
+
+            nom_equipement = stock_item.nom_equipement
+            type_equipement = stock_item.type_equipement
+            type_stock = stock_item.type_stock
+            model_equipement = model_equipement or stock_item.stockage or ''
+            numero_serie = numero_serie or stock_item.numero_serie or ''
+
+            if numero_serie and quantite > 1:
+                return jsonify({'error': 'Avec numéro de série, la quantité doit être 1'}), 400
 
         new_mouvement = Mouvement(
             type_mouvement=type_mouvement,
@@ -109,7 +247,7 @@ def create_mouvement():
             type_equipement=type_equipement,
             quantite=quantite,
             type_stock=type_stock,
-            local_it_destination=source_entree,
+            local_it_destination='parc' if type_mouvement == 'sortie' else source_entree,
             baie_destination=None,
             stockage=model_equipement,
             numero_serie=numero_serie,
@@ -121,10 +259,11 @@ def create_mouvement():
         db.session.add(new_mouvement)
         db.session.flush()
 
-        stock_item = Stock.query.filter_by(
-            nom_equipement=nom_equipement,
-            type_stock=type_stock,
-        ).first()
+        if type_mouvement == 'entrée':
+            stock_item = Stock.query.filter_by(
+                nom_equipement=nom_equipement,
+                type_stock=type_stock,
+            ).first()
 
         if type_mouvement == 'entrée':
             if stock_item:
@@ -145,17 +284,34 @@ def create_mouvement():
                 )
                 db.session.add(stock_item)
 
-        if type_mouvement == 'sortie':
-            if not stock_item:
-                db.session.rollback()
-                return jsonify({'error': 'Aucun stock trouvé pour cette sortie'}), 400
-            if stock_item.quantite < quantite:
-                db.session.rollback()
-                return jsonify({'error': 'Quantité insuffisante dans le stock'}), 400
+            if source_entree == 'parc' and parc_item:
+                db.session.delete(parc_item)
 
+        if type_mouvement == 'sortie':
             stock_item.quantite -= quantite
             stock_item.activite = activite
             stock_item.date_modification = datetime.utcnow()
+
+            for index in range(quantite):
+                parc_numero_serie = numero_serie if index == 0 else None
+
+                if parc_numero_serie:
+                    duplicate_serial = Parc.query.filter_by(numero_serie=parc_numero_serie).first()
+                    if duplicate_serial:
+                        db.session.rollback()
+                        return jsonify({'error': 'Le numéro de série existe déjà dans le parc'}), 400
+
+                parc_item = Parc(
+                    name=nom_equipement,
+                    type=type_equipement,
+                    model=model_equipement or None,
+                    numero_serie=parc_numero_serie,
+                    processeur=stock_item.processeur,
+                    ram=stock_item.ram,
+                    disque_dur=stock_item.stockage,
+                    esu=activite or None,
+                )
+                db.session.add(parc_item)
 
         db.session.commit()
 

@@ -13,6 +13,8 @@ import Login from './pages/Login';
 // Import auth context
 import { AuthProvider, useAuth } from './context/AuthContext';
 
+const HUTCHINSON_LOGO_URL = 'https://cdn.brandfetch.io/hutchinson.com/fallback/lettermark/theme/dark/h/256/w/256/icon?c=1bfwsmEH20zzEfSNTed';
+
 function AppContent() {
   const { user, logout } = useAuth();
 
@@ -20,8 +22,13 @@ function AppContent() {
     <div className="min-h-screen bg-slate-100">
       <header className="bg-white shadow-sm border-b border-slate-200">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Gestion Parc IT</h1>
+          <div className="flex items-center gap-3">
+            <img
+              src={HUTCHINSON_LOGO_URL}
+              alt="Hutchinson"
+              className="h-10 w-10 object-contain"
+            />
+            <h1 className="text-2xl font-bold text-slate-900 underline decoration-2 underline-offset-4">Gestion Parc IT</h1>
           </div>
 
           <nav className="hidden md:flex items-center gap-2 text-sm font-medium text-slate-600">
@@ -51,27 +58,6 @@ function AppContent() {
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-6">
-        <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr] mb-6">
-          <div className="rounded-[28px] bg-gradient-to-r from-sky-500 to-indigo-600 p-8 text-white shadow-lg">
-            <p className="text-sm uppercase tracking-[0.3em] opacity-90">Bienvenue</p>
-            <h2 className="mt-4 text-3xl font-bold">Tableau de bord de gestion</h2>
-            <p className="mt-3 max-w-2xl text-sm text-sky-100">Suivez l’inventaire du stock, les mouvements, les locaux et l’état du parc informatique depuis un seul tableau de bord.</p>
-          </div>
-          <div className="rounded-[28px] bg-white p-6 shadow-lg border border-slate-200">
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-500">Statut rapide</p>
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-3xl bg-slate-100 p-4">
-                <p className="text-sm text-slate-500">Accès</p>
-                <p className="mt-2 text-2xl font-semibold text-slate-900">{user?.role === 'admin' ? 'Modification' : 'Lecture'}</p>
-              </div>
-              <div className="rounded-3xl bg-slate-100 p-4">
-                <p className="text-sm text-slate-500">Utilisateur</p>
-                <p className="mt-2 text-2xl font-semibold text-slate-900">{user?.nom}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <div className="rounded-[28px] bg-white p-6 shadow-sm border border-slate-200">
           <Routes>
             <Route path="/" element={<Dashboard />} />

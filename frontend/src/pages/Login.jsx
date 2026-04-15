@@ -35,10 +35,14 @@ function Login({ onLoginSuccess }) {
       <div className="w-full max-w-md">
         {/* Logo/Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-full mb-4">
-            <Lock size={32} className="text-blue-900" />
+          <div className="inline-flex items-center justify-center gap-3 mb-3">
+            <img
+              src="https://th.bing.com/th/id/OIP.s99ceb4ldSVZijG1ARbJ4QAAAA?o=7rm=3&rs=1&pid=ImgDetMain&o=7&rm=3"
+              alt="Logo Hutchinson"
+              className="h-16 w-auto"
+            />
+            <h1 className="text-4xl font-bold text-white">Gestion Parc IT</h1>
           </div>
-          <h1 className="text-4xl font-bold text-white mb-2">Gestion Parc IT</h1>
           <p className="text-blue-100">Authentification sécurisée</p>
         </div>
 

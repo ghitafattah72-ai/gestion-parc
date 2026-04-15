@@ -167,3 +167,31 @@ class EquipementBaie(db.Model):
     
     def __repr__(self):
         return f'<EquipementBaie {self.id}>'
+
+
+class MaterielIT(db.Model):
+    __tablename__ = 'materiel_it'
+
+    id = db.Column(db.Integer, primary_key=True)
+    type_materiel = db.Column(db.String(100), nullable=False)
+    nom = db.Column(db.String(255), nullable=False)
+    modele = db.Column(db.String(255))
+    version = db.Column(db.String(100))
+    os_firmware = db.Column(db.String(255))
+    numero_serie = db.Column(db.String(100))
+    stack_role = db.Column(db.String(100))
+    stack_ip = db.Column(db.String(100))
+    description = db.Column(db.Text)
+
+    # Linked to either a baie OR directly a local
+    baie_id = db.Column(db.Integer, db.ForeignKey('baies_it.id'), nullable=True)
+    local_it_id = db.Column(db.Integer, db.ForeignKey('locaux_it.id'), nullable=True)
+
+    date_creation = db.Column(db.DateTime, default=datetime.utcnow)
+    date_modification = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    baie = db.relationship('BaieIT', backref='materiels', foreign_keys=[baie_id])
+    local_it = db.relationship('LocalIT', backref='materiels', foreign_keys=[local_it_id])
+
+    def __repr__(self):
+        return f'<MaterielIT {self.nom}>'
