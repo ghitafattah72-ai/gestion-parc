@@ -3,6 +3,9 @@ import { Lock, User } from 'lucide-react';
 import { authAPI } from '../api';
 import { useAuth } from '../context/AuthContext';
 
+const HUTCHINSON_LOGO_SVG_URL = 'https://cdn.brandfetch.io/hutchinson.com/icon.svg?c=1bfwsmEH20zzEfSNTed';
+const HUTCHINSON_LOGO_FALLBACK_URL = 'https://cdn.brandfetch.io/hutchinson.com/icon?c=1bfwsmEH20zzEfSNTed';
+
 function Login({ onLoginSuccess }) {
   const { login } = useAuth();
   const [username, setUsername] = useState('');
@@ -37,9 +40,14 @@ function Login({ onLoginSuccess }) {
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center gap-3 mb-3">
             <img
-              src="https://th.bing.com/th/id/OIP.s99ceb4ldSVZijG1ARbJ4QAAAA?o=7rm=3&rs=1&pid=ImgDetMain&o=7&rm=3"
+              src={HUTCHINSON_LOGO_SVG_URL}
+              onError={(e) => {
+                if (e.currentTarget.src !== HUTCHINSON_LOGO_FALLBACK_URL) {
+                  e.currentTarget.src = HUTCHINSON_LOGO_FALLBACK_URL;
+                }
+              }}
               alt="Logo Hutchinson"
-              className="h-16 w-auto"
+              className="h-16 w-16 object-contain"
             />
             <h1 className="text-4xl font-bold text-white">Gestion Parc IT</h1>
           </div>
@@ -118,7 +126,7 @@ function Login({ onLoginSuccess }) {
 
         {/* Footer */}
         <p className="text-center text-blue-100 text-sm mt-6">
-          © 2026 Hutchinson - Gestion du Parc Informatique
+          © 2026 Hutchinson - Gestion du Parc IT
         </p>
       </div>
     </div>

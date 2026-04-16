@@ -48,6 +48,8 @@ export const mouvementsAPI = {
   getParcSources: (type_equipement, search = '') =>
     api.get('/mouvements/sources/parc', { params: { type_equipement, search } }),
   getHistorique: () => api.get('/mouvements/historique'),
+  restoreHistorique: (id) => api.put(`/mouvements/historique/${id}/restore`),
+  deleteHistorique: (id) => api.delete(`/mouvements/historique/${id}`),
   getById: (id) => api.get(`/mouvements/${id}`),
   create: (data) => api.post('/mouvements/', data),
   delete: (id) => api.delete(`/mouvements/${id}`),
@@ -92,9 +94,14 @@ export const locauxITAPI = {
   createBaie: (localId, data) => api.post(`/locaux-it/${localId}/baies`, data),
   updateBaie: (id, data) => api.put(`/locaux-it/baies/${id}`, data),
   deleteBaie: (id) => api.delete(`/locaux-it/baies/${id}`),
+  exportLocaux: (format = 'csv') =>
+    api.get('/locaux-it/export', { params: { format }, responseType: 'blob' }),
+  exportBaies: (format = 'csv') =>
+    api.get('/locaux-it/baies/export', { params: { format }, responseType: 'blob' }),
 
   // Matériels IT (réseau)
   createMateriel: (data) => api.post('/locaux-it/materiels', data),
+  transferMateriel: (id, data) => api.put(`/locaux-it/materiels/${id}/transfer`, data),
   deleteMateriel: (id) => api.delete(`/locaux-it/materiels/${id}`),
 };
 

@@ -24,6 +24,7 @@ const PARC_TYPES = [
   'autre'
 ];
 const DETAILED_TYPES = ['pc portable', 'pc fixe'];
+const ACTIVITE_OPTIONS = ['FSS', 'IMS', 'C2S', 'Commun'];
 
 const getEmptyFormData = () => ({
   name: '',
@@ -32,6 +33,7 @@ const getEmptyFormData = () => ({
   os_version: '',
   type: '',
   model: '',
+  version: '',
   manufacturer: '',
   numero_serie: '',
   processeur: '',
@@ -54,7 +56,6 @@ export default function Parc() {
     service: '',
     emplacement: '',
     activite: '',
-    user: '',
   });
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -185,9 +186,6 @@ export default function Parc() {
   const typeOptions = uniqueValues(items, (item) => item.type);
   const serviceOptions = uniqueValues(items, (item) => item.service);
   const emplacementOptions = uniqueValues(items, (item) => item.emplacement);
-  const activiteOptions = uniqueValues(items, (item) => item.activite || item.esu);
-  const userOptions = uniqueValues(items, (item) => item.alternate_username);
-
   const filteredItems = items.filter((item) => {
     const equalsFilter = (value, selected) => {
       if (!selected) return true;
@@ -198,8 +196,7 @@ export default function Parc() {
       equalsFilter(item.type, filters.type) &&
       equalsFilter(item.service, filters.service) &&
       equalsFilter(item.emplacement, filters.emplacement) &&
-      equalsFilter(item.activite || item.esu, filters.activite) &&
-      equalsFilter(item.alternate_username, filters.user)
+      equalsFilter(item.activite || item.esu, filters.activite)
     );
   });
 
@@ -240,14 +237,14 @@ export default function Parc() {
             requiredAction="edit"
             className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
           >
-            <Plus size={18} /> Ajouter
+            <Plus size={18} /> Ajouter 
           </RestrictedButton>
         </div>
       </div>
 
       {/* Search */}
       <div className="bg-white p-4 rounded-lg shadow">
-        <div className="grid gap-2 md:grid-cols-[2fr_1fr_1fr]">
+        <div className="grid gap-2 md:grid-cols-[2fr_1fr]">
           <div className="flex items-center gap-2 bg-gray-100 rounded px-3">
             <Search size={18} className="text-gray-500" />
             <input
@@ -261,16 +258,6 @@ export default function Parc() {
               className="flex-1 bg-transparent outline-none p-2"
             />
           </div>
-          <select
-            value={filters.user}
-            onChange={(e) => setFilters({ ...filters, user: e.target.value })}
-            className="w-full p-2 border rounded"
-          >
-            <option value="">Filtre User</option>
-            {userOptions.map((option) => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
           <select
             value={filters.type}
             onChange={(e) => setFilters({ ...filters, type: e.target.value })}
@@ -309,7 +296,7 @@ export default function Parc() {
             className="w-full p-2 border rounded"
           >
             <option value="">Filtre Activité</option>
-            {activiteOptions.map((option) => (
+            {ACTIVITE_OPTIONS.map((option) => (
               <option key={option} value={option}>{option}</option>
             ))}
           </select>
@@ -356,6 +343,13 @@ export default function Parc() {
               />
               <input
                 type="text"
+                placeholder="Version"
+                value={formData.version}
+                onChange={(e) => setFormData({ ...formData, version: e.target.value })}
+                className="p-2 border rounded"
+              />
+              <input
+                type="text"
                 placeholder="N° de série"
                 value={formData.numero_serie}
                 onChange={(e) => setFormData({ ...formData, numero_serie: e.target.value })}
@@ -382,13 +376,19 @@ export default function Parc() {
                 onChange={(e) => setFormData({ ...formData, service: e.target.value })}
                 className="p-2 border rounded"
               />
-              <input
-                type="text"
-                placeholder="ESU"
+              <select
                 value={formData.esu}
                 onChange={(e) => setFormData({ ...formData, esu: e.target.value })}
                 className="p-2 border rounded"
-              />
+              >
+                <option value="">Activitée</option>
+                {ACTIVITE_OPTIONS.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+                {formData.esu && !ACTIVITE_OPTIONS.includes(formData.esu) && (
+                  <option value={formData.esu}>{formData.esu}</option>
+                )}
+              </select>
               {isDetailedType && (
                 <>
                   <select
@@ -444,20 +444,22 @@ export default function Parc() {
               <th className="p-3 text-left">User</th>
               <th className="p-3 text-left">Type</th>
               <th className="p-3 text-left">Model</th>
+              <th className="p-3 text-left">Version</th>
               <th className="p-3 text-left">N° Série</th>
               <th className="p-3 text-left">OS</th>
               <th className="p-3 text-left">Processeur</th>
               <th className="p-3 text-left">RAM</th>
               <th className="p-3 text-left">Disque</th>
               <th className="p-3 text-left">Service</th>
+              <th className="p-3 text-left">Activitée</th>
               <th className="p-3 text-left">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="11" className="p-3 text-center">Chargement...</td></tr>
+              <tr><td colSpan="13" className="p-3 text-center">Chargement...</td></tr>
             ) : filteredItems.length === 0 ? (
-              <tr><td colSpan="11" className="p-3 text-center">Aucun équipement</td></tr>
+              <tr><td colSpan="13" className="p-3 text-center">Aucun équipement</td></tr>
             ) : (
               filteredItems.map(item => (
                 <tr key={item.id} className="border-b hover:bg-gray-50">
@@ -465,12 +467,14 @@ export default function Parc() {
                   <td className="p-3">{item.alternate_username || '-'}</td>
                   <td className="p-3">{item.type || '-'}</td>
                   <td className="p-3">{item.model || '-'}</td>
+                  <td className="p-3">{item.version || '-'}</td>
                   <td className="p-3">{item.numero_serie || '-'}</td>
                   <td className="p-3">{item.os_name || '-'}</td>
                   <td className="p-3">{item.processeur || '-'}</td>
                   <td className="p-3">{item.ram || '-'}</td>
                   <td className="p-3">{item.disque_dur || '-'}</td>
                   <td className="p-3">{item.service || '-'}</td>
+                  <td className="p-3">{item.esu || '-'}</td>
                   <td className="p-3 flex gap-2">
                     <RestrictedButton
                       onClick={() => handleEditItem(item)}

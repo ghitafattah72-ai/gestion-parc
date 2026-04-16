@@ -1,6 +1,7 @@
 from flask import Flask
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
+from sqlalchemy import inspect, text
 from config import Config
 from models import db, Utilisateur
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -10,15 +11,15 @@ from datetime import datetime
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
-    
+
     # Add JWT configuration
     app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
-    
+
     # Initialize extensions
     db.init_app(app)
     CORS(app)
     jwt = JWTManager(app)
-    
+
     # Register blueprints
     from routes.stock import stock_bp
     from routes.mouvements import mouvements_bp
@@ -37,6 +38,7 @@ def create_app():
     # Create tables and default users
     with app.app_context():
         db.create_all()
+        ensure_parc_version_column()
         create_default_users()
     
     return app
@@ -85,6 +87,24 @@ def create_default_users():
     except Exception as e:
         print(f"Error creating default users: {e}")
         db.session.rollback()
+
+
+def ensure_parc_version_column():
+    try:
+        inspector = inspect(db.engine)
+        if 'parc' not in inspector.get_table_names():
+            return
+
+        columns = {column['name'] for column in inspector.get_columns('parc')}
+        if 'version' in columns:
+            return
+
+        db.session.execute(text('ALTER TABLE parc ADD COLUMN version VARCHAR(100)'))
+        db.session.commit()
+        print('✓ Colonne parc.version ajoutée')
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error ensuring parc.version column: {e}")
 
 if __name__ == '__main__':
     app = create_app()

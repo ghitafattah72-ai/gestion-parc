@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { stockAPI } from '../api';
-import { Plus, Trash2, Download, Search, Pencil, Upload } from 'lucide-react';
+import { Trash2, Download, Search, Pencil, Upload } from 'lucide-react';
 import { RestrictedButton } from '../components/ProtectedRoute';
 import { useAuth } from '../context/AuthContext';
 import { handleExportFile } from '../utils/fileExport';
@@ -13,7 +13,7 @@ const equipmentTypes = [
 ];
 
 const typeStocks = ['FSS', 'IMS', 'C2S', 'Commun'];
-const states = ['nouveau', 'occasion bon état', 'occasion mauvaise état', 'en panne'];
+const activiteOptions = ['FSS', 'IMS', 'C2S', 'Commun'];
 
 export default function Stock() {
   const { hasPermission } = useAuth();
@@ -162,8 +162,6 @@ export default function Stock() {
     }
   };
 
-  const isPCType = ['pc portable', 'pc fixe', 'ipo'].includes(formData.type_equipement);
-
   return (
     <div className="space-y-6">
       <div className="rounded-[28px] bg-gradient-to-r from-slate-900 to-slate-700 p-6 text-white shadow-lg">
@@ -200,13 +198,6 @@ export default function Stock() {
               className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
             >
               <Download size={18} /> Excel
-            </RestrictedButton>
-            <RestrictedButton
-              onClick={() => setShowForm(!showForm)}
-              requiredAction="edit"
-              className="flex items-center gap-2 rounded-full bg-sky-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-600"
-            >
-              <Plus size={18} /> Ajouter
             </RestrictedButton>
           </div>
         </div>
@@ -247,7 +238,7 @@ export default function Stock() {
       {/* Form */}
       {showForm && (
         <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-xl font-bold mb-4">{editingId ? 'Modifier l\'équipement' : 'Ajouter un nouvel équipement'}</h3>
+          <h3 className="text-xl font-bold mb-4">Modifier l'équipement</h3>
           <form onSubmit={handleSaveItem} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <input
@@ -271,6 +262,21 @@ export default function Stock() {
               </select>
 
               <input
+                type="text"
+                placeholder="Model"
+                value={formData.stockage}
+                onChange={(e) => setFormData({ ...formData, stockage: e.target.value })}
+                className="p-2 border rounded"
+              />
+              <input
+                type="text"
+                placeholder="Numero du serie"
+                value={formData.numero_serie}
+                onChange={(e) => setFormData({ ...formData, numero_serie: e.target.value })}
+                className="p-2 border rounded"
+              />
+
+              <input
                 type="number"
                 placeholder="Quantité"
                 value={formData.quantite}
@@ -290,71 +296,16 @@ export default function Stock() {
               </select>
 
               <select
-                value={formData.etat}
-                onChange={(e) => setFormData({ ...formData, etat: e.target.value })}
+                value={formData.activite}
+                onChange={(e) => setFormData({ ...formData, activite: e.target.value })}
                 className="p-2 border rounded"
               >
-                {states.map(state => (
-                  <option key={state} value={state}>{state}</option>
+                <option value="">Selectionner activitee</option>
+                {activiteOptions.map((option) => (
+                  <option key={option} value={option}>{option}</option>
                 ))}
               </select>
             </div>
-            <div>
-            
-            </div>
-            {isPCType && (
-              <div className="grid grid-cols-2 gap-4 border-t pt-4">
-                <input
-                  type="text"
-                  placeholder="RAM"
-                  value={formData.ram}
-                  onChange={(e) => setFormData({ ...formData, ram: e.target.value })}
-                  className="p-2 border rounded"
-                />
-                <input
-                  type="text"
-                  placeholder="Stockage"
-                  value={formData.stockage}
-                  onChange={(e) => setFormData({ ...formData, stockage: e.target.value })}
-                  className="p-2 border rounded"
-                />
-                <input
-                  type="text"
-                  placeholder="Processeur"
-                  value={formData.processeur}
-                  onChange={(e) => setFormData({ ...formData, processeur: e.target.value })}
-                  className="p-2 border rounded"
-                />
-                <input
-                  type="text"
-                  placeholder="N° de série"
-                  value={formData.numero_serie}
-                  onChange={(e) => setFormData({ ...formData, numero_serie: e.target.value })}
-                  className="p-2 border rounded"
-                />
-                <input
-                  type="text"
-                  placeholder="Activité"
-                  value={formData.activite}
-                  onChange={(e) => setFormData({ ...formData, activite: e.target.value })}
-                  className="p-2 border rounded"
-                />
-                <input
-                  type="text"
-                  placeholder="Système"
-                  value={formData.systeme}
-                  onChange={(e) => setFormData({ ...formData, systeme: e.target.value })}
-                  className="p-2 border rounded"
-                />
-                <textarea
-                  placeholder="Accessoires"
-                  value={formData.accessoires}
-                  onChange={(e) => setFormData({ ...formData, accessoires: e.target.value })}
-                  className="p-2 border rounded col-span-2"
-                  rows="2"
-                />
-              </div>
-            )}
 
             <div className="flex gap-2 justify-end">
               <button
@@ -368,7 +319,7 @@ export default function Stock() {
                 Annuler
               </button>
               <button type="submit" className="px-4 py-2 bg-blue-500 text-white rounded">
-                {editingId ? 'Modifier' : 'Ajouter'}
+                Modifier
               </button>
             </div>
           </form>
@@ -382,33 +333,29 @@ export default function Stock() {
             <tr>
               <th className="p-3 text-left">Nom</th>
               <th className="p-3 text-left">Type</th>
+              <th className="p-3 text-left">Model</th>
+              <th className="p-3 text-left">Numero du serie</th>
               <th className="p-3 text-left">Quantité</th>
               <th className="p-3 text-left">Type Stock</th>
-              <th className="p-3 text-left">État</th>
+              <th className="p-3 text-left">Activitée</th>
               <th className="p-3 text-left">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="6" className="p-3 text-center">Chargement...</td></tr>
+              <tr><td colSpan="8" className="p-3 text-center">Chargement...</td></tr>
             ) : items.length === 0 ? (
-              <tr><td colSpan="6" className="p-3 text-center">Aucun équipement trouvé</td></tr>
+              <tr><td colSpan="8" className="p-3 text-center">Aucun équipement trouvé</td></tr>
             ) : (
               items.map(item => (
                 <tr key={item.id} className="border-b hover:bg-gray-50">
                   <td className="p-3">{item.nom_equipement}</td>
                   <td className="p-3">{item.type_equipement}</td>
+                  <td className="p-3">{item.stockage || '-'}</td>
+                  <td className="p-3">{item.numero_serie || '-'}</td>
                   <td className="p-3">{item.quantite}</td>
                   <td className="p-3">{item.type_stock}</td>
-                  <td className="p-3">
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      item.etat === 'nouveau' ? 'bg-green-100 text-green-800' :
-                      item.etat === 'en panne' ? 'bg-red-100 text-red-800' :
-                      'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {item.etat}
-                    </span>
-                  </td>
+                  <td className="p-3">{item.activite || '-'}</td>
                   <td className="p-3">
                     <RestrictedButton
                       onClick={() => handleEdit(item)}

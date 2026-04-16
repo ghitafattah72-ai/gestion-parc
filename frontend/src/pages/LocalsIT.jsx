@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { locauxITAPI } from '../api';
-import { Plus, Trash2, Building2, ChevronDown, ChevronRight, Server } from 'lucide-react';
+import { Plus, Trash2, Building2, ChevronDown, ChevronRight, Server, Download, ArrowRightLeft } from 'lucide-react';
 import { RestrictedButton } from '../components/ProtectedRoute';
+import { handleExportFile } from '../utils/fileExport';
 
 const TYPES_BAIE = [
   'sw-core', 'sw-management', 'sw-acces', 'sw-tor', 'sw-hcs',
@@ -29,10 +30,12 @@ export default function LocalsIT() {
   const [showLocalForm, setShowLocalForm] = useState(false);
   const [showBaieForm, setShowBaieForm] = useState(null); // localId
   const [materielModal, setMaterielModal] = useState(null); // { type: 'baie'|'local', id: baieId|localId }
+  const [transferModal, setTransferModal] = useState(null); // { materielId, nom, currentLocalId, currentBaieId }
 
   const [localForm, setLocalForm] = useState({ nom: '' });
   const [baieFormNom, setBaieFormNom] = useState('');
   const [materielForm, setMaterielForm] = useState(EMPTY_MATERIEL);
+  const [transferForm, setTransferForm] = useState({ local_it_id: '', baie_id: '' });
   const [saving, setSaving] = useState(false);
   const baieFormRef = useRef(null);
 
@@ -129,6 +132,74 @@ export default function LocalsIT() {
     setMaterielModal({ type, id });
   };
 
+  const openTransferModal = (materiel, context) => {
+    setTransferModal({
+      materielId: materiel.id,
+      nom: materiel.nom,
+      currentLocalId: context.currentLocalId,
+      currentBaieId: context.currentBaieId || null,
+    });
+    setTransferForm({
+      local_it_id: String(context.currentLocalId || ''),
+      baie_id: '',
+    });
+  };
+
+  const handleTransferMateriel = async (e) => {
+    e.preventDefault();
+    if (!transferModal) return;
+
+    const payload = transferForm.baie_id
+      ? { baie_id: Number(transferForm.baie_id) }
+      : transferForm.local_it_id
+        ? { local_it_id: Number(transferForm.local_it_id) }
+        : null;
+
+    if (!payload) {
+      alert('Choisissez une destination');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await locauxITAPI.transferMateriel(transferModal.materielId, payload);
+      setTransferModal(null);
+      setTransferForm({ local_it_id: '', baie_id: '' });
+      loadLocaux();
+    } catch (error) {
+      alert(error?.response?.data?.error || 'Erreur lors du transfert');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const selectedTransferLocal = locaux.find((local) => String(local.id) === String(transferForm.local_it_id));
+  const selectedTransferBaies = selectedTransferLocal?.baies || [];
+
+  const handleExportLocaux = async (format) => {
+    try {
+      await handleExportFile(
+        (fmt) => locauxITAPI.exportLocaux(fmt),
+        format,
+        'locaux_it'
+      );
+    } catch (error) {
+      alert(error.message);
+    }
+  };
+
+  const handleExportBaies = async (format) => {
+    try {
+      await handleExportFile(
+        (fmt) => locauxITAPI.exportBaies(fmt),
+        format,
+        'baies_it'
+      );
+    } catch (error) {
+      alert(error.message);
+    }
+  };
+
   /* ---- RENDER ---- */
   return (
     <div className="space-y-6">
@@ -141,13 +212,43 @@ export default function LocalsIT() {
             </h2>
             <p className="mt-2 text-slate-300 text-sm">Naviguez dans vos locaux, baies et matériels réseau.</p>
           </div>
-          <RestrictedButton
-            onClick={() => setShowLocalForm(true)}
-            requiredAction="edit"
-            className="flex items-center gap-2 rounded-full bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600"
-          >
-            <Plus size={18} /> Ajouter un local
-          </RestrictedButton>
+          <div className="flex flex-wrap items-center gap-2">
+            <RestrictedButton
+              onClick={() => handleExportLocaux('csv')}
+              requiredAction="export"
+              className="flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-600"
+            >
+              <Download size={16} /> Locaux CSV
+            </RestrictedButton>
+            <RestrictedButton
+              onClick={() => handleExportLocaux('xlsx')}
+              requiredAction="export"
+              className="flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+            >
+              <Download size={16} /> Locaux Excel
+            </RestrictedButton>
+            <RestrictedButton
+              onClick={() => handleExportBaies('csv')}
+              requiredAction="export"
+              className="flex items-center gap-2 rounded-full bg-teal-500 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-600"
+            >
+              <Download size={16} /> Baies CSV
+            </RestrictedButton>
+            <RestrictedButton
+              onClick={() => handleExportBaies('xlsx')}
+              requiredAction="export"
+              className="flex items-center gap-2 rounded-full bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700"
+            >
+              <Download size={16} /> Baies Excel
+            </RestrictedButton>
+            <RestrictedButton
+              onClick={() => setShowLocalForm(true)}
+              requiredAction="edit"
+              className="flex items-center gap-2 rounded-full bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600"
+            >
+              <Plus size={18} /> Ajouter un local
+            </RestrictedButton>
+          </div>
         </div>
       </div>
 
@@ -233,7 +334,7 @@ export default function LocalsIT() {
                     className="w-full p-3 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-violet-500" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-slate-600">OS / Firmware</label>
+                  <label className="block text-sm font-medium mb-1 text-slate-600">OS </label>
                   <input type="text" placeholder="Système / Firmware" value={materielForm.os_firmware}
                     onChange={(e) => setMaterielForm({ ...materielForm, os_firmware: e.target.value })}
                     className="w-full p-3 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-violet-500" />
@@ -275,11 +376,63 @@ export default function LocalsIT() {
         </div>
       )}
 
+      {transferModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
+          <div className="w-full max-w-xl rounded-[20px] bg-white p-6 shadow-2xl border-l-4 border-amber-500">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-xl font-bold">Transférer un Matériel</h3>
+              <button onClick={() => setTransferModal(null)} className="rounded-lg bg-slate-100 px-3 py-2 text-sm hover:bg-slate-200">Fermer</button>
+            </div>
+            <p className="mb-4 text-sm text-slate-600">
+              Destination pour <span className="font-semibold text-slate-900">{transferModal.nom}</span>
+            </p>
+            <form onSubmit={handleTransferMateriel} className="space-y-4">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-600">Local destination</label>
+                <select
+                  value={transferForm.local_it_id}
+                  onChange={(e) => setTransferForm({ local_it_id: e.target.value, baie_id: '' })}
+                  className="w-full rounded-lg border border-slate-200 p-3 outline-none focus:ring-2 focus:ring-amber-500"
+                  required
+                >
+                  <option value="">Sélectionner un local </option>
+                  {locaux.map((local) => (
+                    <option key={local.id} value={local.id}>{local.nom}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-600">Baie distination </label>
+                <select
+                  value={transferForm.baie_id}
+                  onChange={(e) => setTransferForm({ ...transferForm, baie_id: e.target.value })}
+                  className="w-full rounded-lg border border-slate-200 p-3 outline-none focus:ring-2 focus:ring-amber-500"
+                  disabled={!transferForm.local_it_id || selectedTransferBaies.length === 0}
+                >
+                  <option value="">Sélectionner une baie </option>
+                  {selectedTransferBaies.map((baie) => (
+                    <option key={baie.id} value={baie.id}>{baie.nom}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setTransferModal(null)} className="rounded-lg bg-slate-200 px-4 py-2 font-medium hover:bg-slate-300">Annuler</button>
+                <button type="submit" disabled={saving} className="rounded-lg bg-amber-500 px-4 py-2 font-medium text-white hover:bg-amber-600 disabled:opacity-50">
+                  {saving ? 'Transfert...' : 'Transférer'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Locaux list */}
       {loading ? (
         <div className="text-center p-12 text-slate-500">Chargement...</div>
       ) : locaux.length === 0 ? (
-        <div className="text-center p-12 text-slate-400">Aucun local IT. Ajoutez-en un pour commencer.</div>
+        <div className="text-center p-12 text-slate-400">Aucun local IT</div>
       ) : (
         <div className="space-y-4">
           {locaux.map(local => (
@@ -333,14 +486,20 @@ export default function LocalsIT() {
                   {local.materiels && local.materiels.length > 0 && (
                     <div>
                       <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">Matériels directs</p>
-                      <MaterielTable materiels={local.materiels} onDelete={handleDeleteMateriel} />
+                      <MaterielTable
+                        materiels={local.materiels}
+                        onDelete={handleDeleteMateriel}
+                        onTransfer={openTransferModal}
+                        currentLocalId={local.id}
+                        currentBaieId={null}
+                      />
                     </div>
                   )}
 
                   {/* Baies */}
                   {local.baies && local.baies.length > 0 ? (
                     <div className="space-y-3">
-                      <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Baies techniques</p>
+                      <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Baies</p>
                       {local.baies.map(baie => (
                         <div key={baie.id} className="rounded-[14px] border border-slate-200 overflow-hidden">
                           {/* Baie header */}
@@ -380,8 +539,14 @@ export default function LocalsIT() {
                           {expandedBaie === baie.id && (
                             <div className="px-4 py-3 border-t border-slate-100">
                               {baie.materiels && baie.materiels.length > 0
-                                ? <MaterielTable materiels={baie.materiels} onDelete={handleDeleteMateriel} />
-                                : <p className="text-sm text-slate-400 text-center py-4">Aucun matériel dans cette baie.</p>
+                                ? <MaterielTable
+                                    materiels={baie.materiels}
+                                    onDelete={handleDeleteMateriel}
+                                    onTransfer={openTransferModal}
+                                    currentLocalId={local.id}
+                                    currentBaieId={baie.id}
+                                  />
+                                : <p className="text-sm text-slate-400 text-center py-4">Aucun matériel dans cette baie</p>
                               }
                             </div>
                           )}
@@ -389,7 +554,7 @@ export default function LocalsIT() {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-slate-400">Aucune baie dans ce local.</p>
+                    <p className="text-sm text-slate-400">Aucune baie dans ce local</p>
                   )}
                 </div>
               )}
@@ -401,13 +566,13 @@ export default function LocalsIT() {
   );
 }
 
-function MaterielTable({ materiels, onDelete }) {
+function MaterielTable({ materiels, onDelete, onTransfer, currentLocalId, currentBaieId }) {
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200">
       <table className="w-full text-sm">
         <thead className="bg-slate-50 border-b border-slate-200">
           <tr>
-            {['Type', 'Nom', 'Modèle', 'Version', 'OS/Firmware', 'N° Série', 'Stack Rôle', 'Stack IP', ''].map(h => (
+            {['Type', 'Nom', 'Modèle', 'Version', 'OS', 'N° Série', 'Stack Rôle', 'Stack IP', ''].map(h => (
               <th key={h} className="px-3 py-2 text-left text-xs font-semibold text-slate-500 uppercase whitespace-nowrap">{h}</th>
             ))}
           </tr>
@@ -424,6 +589,13 @@ function MaterielTable({ materiels, onDelete }) {
               <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{m.stack_role || '—'}</td>
               <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{m.stack_ip || '—'}</td>
               <td className="px-3 py-2">
+                <RestrictedButton
+                  onClick={() => onTransfer(m, { currentLocalId, currentBaieId })}
+                  requiredAction="edit"
+                  className="mr-3 text-amber-500 hover:text-amber-700"
+                >
+                  <ArrowRightLeft size={14} />
+                </RestrictedButton>
                 <RestrictedButton
                   onClick={() => onDelete(m.id)}
                   requiredAction="edit"

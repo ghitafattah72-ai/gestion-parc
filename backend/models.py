@@ -106,6 +106,7 @@ class Parc(db.Model):
     os_version = db.Column(db.String(50))
     type = db.Column(db.String(100), nullable=False)
     model = db.Column(db.String(255))
+    version = db.Column(db.String(100))
     manufacturer = db.Column(db.String(255))
     numero_serie = db.Column(db.String(100), unique=True)
     processeur = db.Column(db.String(100))

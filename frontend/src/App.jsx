@@ -13,7 +13,8 @@ import Login from './pages/Login';
 // Import auth context
 import { AuthProvider, useAuth } from './context/AuthContext';
 
-const HUTCHINSON_LOGO_URL = 'https://cdn.brandfetch.io/hutchinson.com/fallback/lettermark/theme/dark/h/256/w/256/icon?c=1bfwsmEH20zzEfSNTed';
+const HUTCHINSON_LOGO_SVG_URL = 'https://cdn.brandfetch.io/hutchinson.com/icon.svg?c=1bfwsmEH20zzEfSNTed';
+const HUTCHINSON_LOGO_FALLBACK_URL = 'https://cdn.brandfetch.io/hutchinson.com/icon?c=1bfwsmEH20zzEfSNTed';
 
 function AppContent() {
   const { user, logout } = useAuth();
@@ -24,7 +25,12 @@ function AppContent() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
             <img
-              src={HUTCHINSON_LOGO_URL}
+              src={HUTCHINSON_LOGO_SVG_URL}
+              onError={(e) => {
+                if (e.currentTarget.src !== HUTCHINSON_LOGO_FALLBACK_URL) {
+                  e.currentTarget.src = HUTCHINSON_LOGO_FALLBACK_URL;
+                }
+              }}
               alt="Hutchinson"
               className="h-10 w-10 object-contain"
             />

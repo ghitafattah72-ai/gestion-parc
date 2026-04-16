@@ -8,6 +8,8 @@ export default function Dashboard() {
   const [stats, setStats] = useState({
     stock: [],
     stockByEquipment: [],
+    stockByActivite: [],
+    parcByActivite: [],
     stockTypes: {
       pc_portable: 0,
       pc_fixe: 0,
@@ -22,6 +24,11 @@ export default function Dashboard() {
       total: 0
     }
   });
+  const parcFocusedChartData = [
+    { type: 'pc portable', count: stats.parc.pc_portable || 0 },
+    { type: 'pc fixe', count: stats.parc.pc_fixe || 0 },
+    { type: 'ipo', count: stats.parc.ipo || 0 },
+  ];
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -41,6 +48,8 @@ export default function Dashboard() {
       setStats({
         stock: stockRes.data.stats,
         stockByEquipment: stockRes.data.stats_by_equipment || [],
+        stockByActivite: stockRes.data.stats_by_activite || [],
+        parcByActivite: parcRes.data.stats_by_activite || [],
         stockTypes: {
           pc_portable: stockRes.data.pc_portable || 0,
           pc_fixe: stockRes.data.pc_fixe || 0,
@@ -63,7 +72,7 @@ export default function Dashboard() {
         <div className="rounded-[28px] bg-gradient-to-r from-sky-500 to-indigo-600 p-8 text-white shadow-lg">
           <p className="text-sm uppercase tracking-[0.3em] opacity-90">Bienvenue</p>
           <h2 className="mt-4 text-3xl font-bold">Tableau de bord de gestion</h2>
-          <p className="mt-3 max-w-2xl text-sm text-sky-100">Suivez l'inventaire du stock, les mouvements, les locaux et l’état du parc informatique depuis un seul tableau de bord.</p>
+          <p className="mt-3 max-w-2xl text-sm text-sky-100">Suivez l'inventaire du stock, les mouvements, les locaux et l'état du parc informatique depuis un seul tableau de bord</p>
         </div>
         <div className="rounded-[28px] bg-white p-6 shadow-lg border border-slate-200">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-600">Statut rapide</p>
@@ -79,6 +88,7 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
 
       <div className="bg-gradient-to-r from-slate-50 to-blue-50 p-4 rounded-[20px] shadow border border-slate-200">
         <h3 className="text-lg font-semibold text-slate-900 mb-3">Stock</h3>
@@ -98,33 +108,12 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {stats.parc?.stats?.length > 0 && (
-        <div className="bg-white p-6 rounded-[28px] shadow-md border border-slate-200">
-          <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h3 className="text-xl font-bold text-slate-900">Répartition du Parc par Type</h3>
-              <p className="text-sm text-slate-500">Vue globale des équipements présents dans le parc informatique.</p>
-            </div>
-          </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={stats.parc.stats} barGap={10}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="type" />
-              <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="count" fill="#0F766E" name="Équipements" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
       {stats.stockByEquipment.length > 0 && (
         <div className="bg-white p-6 rounded-[28px] shadow-md border border-slate-200">
           <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="text-xl font-bold text-slate-900">Répartition par Type de Stock</h3>
-              <p className="text-sm text-slate-500">Pour chaque stock, affichage séparé des PC portables, PC fixes et IPO.</p>
+              <p className="text-sm text-slate-500">Pour chaque stock, affichage séparé des PC portables, PC fixes et IPO</p>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={300}>
@@ -132,6 +121,30 @@ export default function Dashboard() {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="type_stock" />
               <YAxis />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="pc_portable" fill="#2563EB" name="PC Portables" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="pc_fixe" fill="#0F766E" name="PC Fixes" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="ipo" fill="#7C3AED" name="IPO" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {stats.parcByActivite.length > 0 && (
+        <div className="bg-white p-6 rounded-[28px] shadow-md border border-slate-200">
+          <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-xl font-bold text-slate-900">Répartition par Type de parc
+</h3>
+              <p className="text-sm text-slate-500">Pour chaque activitée (FSS, IMS, C2S, Commun), affichage des PC portables, PC fixes et IPO.</p>
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={stats.parcByActivite} barGap={10}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="activite" />
+              <YAxis allowDecimals={false} />
               <Tooltip />
               <Legend />
               <Bar dataKey="pc_portable" fill="#2563EB" name="PC Portables" radius={[6, 6, 0, 0]} />

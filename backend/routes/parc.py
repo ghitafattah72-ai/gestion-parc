@@ -14,6 +14,7 @@ PARC_EXPORT_HEADERS = [
     'Operating System - Version',
     'Type',
     'Model',
+    'Version',
     'Manufacturer',
     'N° de série',
     'Processeur',
@@ -96,6 +97,7 @@ def create_parc_item():
             'os_version': _payload_value(data, 'os_version'),
             'type': _payload_value(data, 'type'),
             'model': _payload_value(data, 'model'),
+            'version': _payload_value(data, 'version'),
             'manufacturer': _payload_value(data, 'manufacturer'),
             'numero_serie': _payload_value(data, 'numero_serie'),
             'processeur': _payload_value(data, 'processeur'),
@@ -122,6 +124,7 @@ def create_parc_item():
             os_version=payload['os_version'],
             type=payload['type'],
             model=payload['model'],
+            version=payload['version'],
             manufacturer=payload['manufacturer'],
             numero_serie=payload['numero_serie'],
             processeur=payload['processeur'],
@@ -170,6 +173,7 @@ def update_parc_item(id):
         item.os_version = _payload_value(data, 'os_version')
         item.type = next_type
         item.model = _payload_value(data, 'model')
+        item.version = _payload_value(data, 'version')
         item.manufacturer = _payload_value(data, 'manufacturer')
         item.numero_serie = next_serial
         item.processeur = _payload_value(data, 'processeur')
@@ -239,6 +243,7 @@ def import_parc():
                     'os_version': _first_value(row, ['Operating System - Version', 'OS Version']),
                     'type': _first_value(row, ['Type', 'Équipement', 'equipement']),
                     'model': _first_value(row, ['Model', 'Modèle', 'modele']),
+                    'version': _first_value(row, ['Version', 'version']),
                     'manufacturer': _first_value(row, ['Manufacturer', 'Constructeur']),
                     'numero_serie': serial_number,
                     'processeur': _first_value(row, ['Processeur', 'CPU']),
@@ -261,6 +266,7 @@ def import_parc():
                     existing.os_version = payload['os_version'] or existing.os_version
                     existing.type = payload['type'] or existing.type
                     existing.model = payload['model'] or existing.model
+                    existing.version = payload['version'] or existing.version
                     existing.manufacturer = payload['manufacturer'] or existing.manufacturer
                     existing.processeur = payload['processeur'] or existing.processeur
                     existing.ram = payload['ram'] or existing.ram
@@ -307,6 +313,7 @@ def export_parc():
             item.os_version,
             item.type,
             item.model,
+            item.version,
             item.manufacturer,
             item.numero_serie,
             item.processeur,
@@ -339,6 +346,30 @@ def get_parc_stats():
     ipo_count = Parc.query.filter(Parc.type.ilike('%ipo%')).count()
     imprimante_count = Parc.query.filter(Parc.type.ilike('%imprimante%')).count()
     
+    activite_labels = ['FSS', 'IMS', 'C2S', 'Commun']
+    activite_map = {
+        label: {'activite': label, 'pc_portable': 0, 'pc_fixe': 0, 'ipo': 0}
+        for label in activite_labels
+    }
+    activite_rows = db.session.query(
+        Parc.esu,
+        db.func.sum(
+            db.case((Parc.type.ilike('%pc portable%'), 1), else_=0)
+        ).label('pc_portable'),
+        db.func.sum(
+            db.case((Parc.type.ilike('%pc fixe%'), 1), else_=0)
+        ).label('pc_fixe'),
+        db.func.sum(
+            db.case((Parc.type.ilike('%ipo%'), 1), else_=0)
+        ).label('ipo')
+    ).filter(Parc.esu.in_(activite_labels)).group_by(Parc.esu).all()
+
+    for row in activite_rows:
+        if row[0] in activite_map:
+            activite_map[row[0]]['pc_portable'] = int(row[1] or 0)
+            activite_map[row[0]]['pc_fixe'] = int(row[2] or 0)
+            activite_map[row[0]]['ipo'] = int(row[3] or 0)
+
     return jsonify({
         'stats': [
             {
@@ -346,6 +377,7 @@ def get_parc_stats():
                 'count': s[1]
             } for s in stats
         ],
+        'stats_by_activite': list(activite_map.values()),
         'pc_portable': pc_portable_count,
         'pc_fixe': pc_fixe_count,
         'ipo': ipo_count,
@@ -362,6 +394,7 @@ def parc_to_dict(item):
         'os_version': item.os_version,
         'type': item.type,
         'model': item.model,
+        'version': item.version,
         'manufacturer': item.manufacturer,
         'numero_serie': item.numero_serie,
         'processeur': item.processeur,

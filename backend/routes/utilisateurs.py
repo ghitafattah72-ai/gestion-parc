@@ -180,7 +180,6 @@ def user_to_dict(item):
     return {
         'id': item.id,
         'nom': item.nom,
-        'email': item.email,
         'role': item.role,
         'permission_export': item.permission_export,
         'permission_import': item.permission_import,

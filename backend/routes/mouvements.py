@@ -1,9 +1,10 @@
 from datetime import datetime
 from flask import Blueprint, jsonify, request
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from decorators import check_permission
 from export_utils import export_to_csv, export_to_excel, get_export_filename
-from models import db, Mouvement, MouvementHistorique, Stock, Parc
+from models import db, Mouvement, MouvementHistorique, Stock, Parc, Utilisateur
 
 mouvements_bp = Blueprint('mouvements', __name__, url_prefix='/api/mouvements')
 
@@ -33,6 +34,22 @@ def _to_int(raw_value):
         return int(raw_value)
     except (TypeError, ValueError):
         return None
+
+
+def _require_admin_user():
+    try:
+        current_user_id = int(get_jwt_identity())
+    except (TypeError, ValueError):
+        return None
+
+    current_user = Utilisateur.query.get(current_user_id)
+    if not current_user:
+        return None
+
+    if (current_user.role or '').strip().lower() != 'admin':
+        return False
+
+    return current_user
 
 # GET all movements
 @mouvements_bp.route('/', methods=['GET'])
@@ -251,7 +268,7 @@ def create_mouvement():
             baie_destination=None,
             stockage=model_equipement,
             numero_serie=numero_serie,
-            activite=activite if type_mouvement == 'sortie' else None,
+            activite=activite or None,
             description=description,
             date_mouvement=date_mouvement,
         )
@@ -271,6 +288,7 @@ def create_mouvement():
                 stock_item.type_equipement = type_equipement
                 stock_item.stockage = model_equipement or stock_item.stockage
                 stock_item.numero_serie = numero_serie or stock_item.numero_serie
+                stock_item.activite = activite or stock_item.activite
                 stock_item.date_modification = datetime.utcnow()
             else:
                 stock_item = Stock(
@@ -281,6 +299,7 @@ def create_mouvement():
                     etat='nouveau',
                     stockage=model_equipement,
                     numero_serie=numero_serie,
+                    activite=activite or None,
                 )
                 db.session.add(stock_item)
 
@@ -389,6 +408,89 @@ def get_historique_mouvements_supprimes():
         for item in items
     ])
 
+
+@mouvements_bp.route('/historique/<int:id>/restore', methods=['PUT'])
+@jwt_required()
+def restore_historique_mouvement(id):
+    admin_user = _require_admin_user()
+    if admin_user is None:
+        return jsonify({'error': 'Utilisateur non authentifié'}), 401
+    if admin_user is False:
+        return jsonify({'error': 'Autorisation refusée'}), 403
+
+    item = MouvementHistorique.query.get_or_404(id)
+
+    try:
+        mouvement_restored = Mouvement(
+            type_mouvement=item.type_mouvement,
+            nom_equipement=item.nom_equipement,
+            type_equipement=item.type_equipement,
+            quantite=item.quantite,
+            type_stock=item.type_stock,
+            local_it_destination=item.local_it_destination,
+            baie_destination=item.baie_destination,
+            stockage=item.model_equipement,
+            numero_serie=item.numero_serie,
+            activite=item.activite,
+            description=item.description,
+            date_mouvement=item.date_mouvement_originale or datetime.utcnow(),
+        )
+        db.session.add(mouvement_restored)
+
+        stock_item = Stock.query.filter_by(
+            nom_equipement=item.nom_equipement,
+            type_stock=item.type_stock,
+        ).first()
+
+        if item.type_mouvement == 'entrée':
+            if stock_item:
+                stock_item.quantite += item.quantite
+                stock_item.date_modification = datetime.utcnow()
+            else:
+                stock_item = Stock(
+                    nom_equipement=item.nom_equipement,
+                    type_equipement=item.type_equipement,
+                    quantite=item.quantite,
+                    type_stock=item.type_stock,
+                    etat='nouveau',
+                    stockage=item.model_equipement,
+                    numero_serie=item.numero_serie,
+                    activite=item.activite,
+                )
+                db.session.add(stock_item)
+        elif item.type_mouvement == 'sortie' and stock_item:
+            if stock_item.quantite < item.quantite:
+                db.session.rollback()
+                return jsonify({'error': 'Stock insuffisant pour restaurer cette sortie'}), 400
+            stock_item.quantite -= item.quantite
+            stock_item.date_modification = datetime.utcnow()
+
+        db.session.delete(item)
+        db.session.commit()
+        return jsonify({'message': 'Mouvement restauré avec succès'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+
+@mouvements_bp.route('/historique/<int:id>', methods=['DELETE'])
+@jwt_required()
+def delete_historique_mouvement(id):
+    admin_user = _require_admin_user()
+    if admin_user is None:
+        return jsonify({'error': 'Utilisateur non authentifié'}), 401
+    if admin_user is False:
+        return jsonify({'error': 'Autorisation refusée'}), 403
+
+    item = MouvementHistorique.query.get_or_404(id)
+    try:
+        db.session.delete(item)
+        db.session.commit()
+        return jsonify({'message': 'Historique supprimé définitivement'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
 # GET movement statistics
 @mouvements_bp.route('/stats', methods=['GET'])
 def get_stats():
@@ -417,8 +519,8 @@ def export_mouvements():
     
     # Prepare headers
     headers = [
-        'ID', 'Type Mouvement', 'Équipement', 'Type Matériel', 'Model', 'N° Série',
-        'Quantité', 'Type Stock', 'Source Entrée', 'Activité', 'Description', 'Date'
+        'ID', 'Type Mouvement', 'Equipement', 'Type Materiel', 'Model', 'Numero du serie',
+        'Quantite', 'Type Stock', 'Source Entree', 'Activitee', 'Description', 'Date'
     ]
     
     # Prepare data rows

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { mouvementsAPI } from '../api';
-import { Plus, Trash2, Download, Search } from 'lucide-react';
+import { Plus, Trash2, Download, Search, RotateCcw } from 'lucide-react';
 import { RestrictedButton } from '../components/ProtectedRoute';
 import { handleExportFile } from '../utils/fileExport';
 
@@ -12,6 +12,7 @@ const equipmentTypes = [
 
 const typeStocks = ['FSS', 'IMS', 'C2S', 'Commun'];
 const mouvementTypes = ['Entrée', 'Sortie'];
+const activiteOptions = ['FSS', 'IMS', 'C2S', 'Commun'];
 
 const getTodayDateInput = () => new Date().toISOString().split('T')[0];
 
@@ -146,6 +147,33 @@ export default function Mouvements() {
     }
   };
 
+  const handleRestoreHistory = async (id) => {
+    if (!window.confirm('Restaurer ce mouvement supprimé ?')) return;
+
+    try {
+      await mouvementsAPI.restoreHistorique(id);
+      alert('Mouvement restauré');
+      loadMouvements();
+      loadHistory();
+    } catch (error) {
+      console.error('Erreur:', error);
+      alert(error?.response?.data?.error || 'Erreur lors de la restauration');
+    }
+  };
+
+  const handleDeleteHistoryPermanent = async (id) => {
+    if (!window.confirm('Supprimer définitivement cet élément de l\'historique ?')) return;
+
+    try {
+      await mouvementsAPI.deleteHistorique(id);
+      alert('Historique supprimé définitivement');
+      loadHistory();
+    } catch (error) {
+      console.error('Erreur:', error);
+      alert(error?.response?.data?.error || 'Erreur lors de la suppression définitive');
+    }
+  };
+
   const handleExport = async (format) => {
     try {
       await handleExportFile(
@@ -200,7 +228,7 @@ export default function Mouvements() {
       numero_serie: '',
       type_stock: '',
       quantite: 1,
-      activite: 'Transfert vers parc',
+      activite: '',
     }));
   }, [showForm, formData.type_mouvement, formData.type_equipement, availableStockTypes]);
 
@@ -286,7 +314,7 @@ export default function Mouvements() {
       ...getEmptyForm(),
       type_mouvement: value,
       source_entree: value === 'Entrée' ? 'achat' : '',
-      activite: value === 'Sortie' ? 'Transfert vers parc' : '',
+      activite: '',
     });
     setSourceSearch('');
     setSourceItems([]);
@@ -320,7 +348,7 @@ export default function Mouvements() {
       model_equipement: prev.type_mouvement === 'Sortie' || prev.source_entree === 'parc' ? '' : prev.model_equipement,
       numero_serie: prev.type_mouvement === 'Sortie' || prev.source_entree === 'parc' ? '' : prev.numero_serie,
       quantite: prev.source_entree === 'parc' ? 1 : prev.quantite,
-      activite: prev.type_mouvement === 'Sortie' ? 'Transfert vers parc' : prev.activite,
+      activite: prev.activite,
     }));
     setSourceItems([]);
     setSourceSearch('');
@@ -337,7 +365,7 @@ export default function Mouvements() {
       numero_serie: selected?.numero_serie || '',
       type_stock: selected?.type_stock || '',
       quantite: 1,
-      activite: 'Transfert vers parc',
+      activite: prev.activite,
     }));
   };
 
@@ -562,32 +590,28 @@ export default function Mouvements() {
                 </select>
               )}
 
-              {isEntree ? (
-                <>
-                  <input
-                    type="date"
-                    value={formData.date_affectation}
-                    onChange={(e) => setFormData({ ...formData, date_affectation: e.target.value })}
-                    className="p-2 border rounded"
-                    disabled={isEntreeParc}
-                    hidden={isEntreeParc}
-                  />
-                </>
-              ) : (
-                <>
-                  <input
-                    type="text"
-                    placeholder="Activité"
-                    value={formData.activite}
-                    onChange={(e) => setFormData({ ...formData, activite: e.target.value })}
-                    className="p-2 border rounded bg-gray-50 text-gray-600"
-                    required
-                    disabled
-                    hidden={isSortie}
-                  />
-                  {!isSortie && <div />}
-                </>
+              {isEntree && (
+                <input
+                  type="date"
+                  value={formData.date_affectation}
+                  onChange={(e) => setFormData({ ...formData, date_affectation: e.target.value })}
+                  className="p-2 border rounded"
+                  disabled={isEntreeParc}
+                  hidden={isEntreeParc}
+                />
               )}
+
+              <select
+                value={formData.activite}
+                onChange={(e) => setFormData({ ...formData, activite: e.target.value })}
+                className="p-2 border rounded"
+                required={isSortie}
+              >
+                <option value="">Sélectionner activité</option>
+                {activiteOptions.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
             </div>
 
             {(isSortie || isEntreeParc) && (
@@ -706,11 +730,12 @@ export default function Mouvements() {
               <th className="p-3 text-left">Model</th>
               <th className="p-3 text-left">N° Série</th>
               <th className="p-3 text-left">Date Suppression</th>
+              <th className="p-3 text-left">Actions</th>
             </tr>
           </thead>
           <tbody>
             {historyItems.length === 0 ? (
-              <tr><td colSpan="5" className="p-3 text-center">Aucun historique</td></tr>
+              <tr><td colSpan="6" className="p-3 text-center">Aucun historique</td></tr>
             ) : (
               historyItems.map((item) => (
                 <tr key={item.id} className="border-b hover:bg-gray-50">
@@ -719,6 +744,22 @@ export default function Mouvements() {
                   <td className="p-3">{item.model_equipement || '-'}</td>
                   <td className="p-3">{item.numero_serie || '-'}</td>
                   <td className="p-3">{item.date_suppression ? new Date(item.date_suppression).toLocaleString() : '-'}</td>
+                  <td className="p-3">
+                    <RestrictedButton
+                      onClick={() => handleRestoreHistory(item.id)}
+                      requiredAction="edit"
+                      className="mr-3 text-emerald-600 hover:text-emerald-800"
+                    >
+                      <RotateCcw size={16} />
+                    </RestrictedButton>
+                    <RestrictedButton
+                      onClick={() => handleDeleteHistoryPermanent(item.id)}
+                      requiredAction="edit"
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      <Trash2 size={16} />
+                    </RestrictedButton>
+                  </td>
                 </tr>
               ))
             )}

@@ -77,6 +77,7 @@ CREATE TABLE parc (
   os_version VARCHAR(50),
   type VARCHAR(100) NOT NULL,
   model VARCHAR(255),
+  version VARCHAR(100),
   manufacturer VARCHAR(255),
   numero_serie VARCHAR(100) UNIQUE,
   processeur VARCHAR(100),
@@ -138,12 +139,12 @@ CREATE TABLE equipements_baies (
 );
 
 -- Insertion des locaux IT par défaut
-INSERT INTO locaux_it (nom, description, localisation) VALUES
-('CIM2', 'Local informatique CIM2', 'bâtiment'),
-('CIM6', 'Local informatique CIM6', 'bâtiment'),
-('CIM7', 'Local informatique CIM7', 'bâtiment'),
-('CIM4H1', 'Local informatique CIM4H1', 'bâtiment'),
-('CIM4H2', 'Local informatique CIM4H2', 'bâtiment');
+INSERT INTO locaux_it (nom, description,) VALUES
+('CIM2', 'Local informatique CIM2'),
+('CIM6', 'Local informatique CIM6'),
+('CIM7', 'Local informatique CIM7'),
+('CIM4H1', 'Local informatique CIM4H1'),
+('CIM4H2', 'Local informatique CIM4H2');
 
 -- Insertion de baies par défaut pour CIM6
 INSERT INTO baies_it (nom, numero, local_it_id, description) VALUES
@@ -153,5 +154,5 @@ INSERT INTO baies_it (nom, numero, local_it_id, description) VALUES
 ('Baie 4', 4, 2, 'Baie 4 CIM6');
 
 -- Insertion d'un utilisateur admin par défaut
-INSERT INTO utilisateurs (nom, email, password, role, permission_export, permission_import) VALUES
-('Admin', 'admin@hutchinson.com', 'admin123', 'admin', TRUE, TRUE);
+INSERT INTO utilisateurs (nom, password, role, permission_export, permission_import) VALUES
+('visiteur', 'visiteur@hutchinson', 'visiteur', TRUE, TRUE);

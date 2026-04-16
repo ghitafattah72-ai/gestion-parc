@@ -4,7 +4,7 @@
 gs parc/
 │
 ├── DOCUMENTATION
-│   ├── START.md ........................... Démarrage rapide (2 min)
+│   ├── START.md ........................... Démarrage rapide 
 │   ├── README.md .......................... Vue d'ensemble générale
 │   ├── INSTALLATION.md .................... Installation détaillée
 │   ├── DEMARRAGE_RAPIDE.md ................ Commandes immédiates
@@ -21,9 +21,7 @@ gs parc/
 │
 ├── CONFIGURATION
 │   ├── setup.bat .......................... Setup Windows
-│   ├── setup.sh ........................... Setup Linux/Mac
-│   └── .gitignore ......................... Fichiers ignorés Git
-│
+  
 ├── BACKEND (Python Flask)
 │   │
 │   ├── app.py ............................ Application principale
@@ -35,18 +33,18 @@ gs parc/
 │   │
 │   ├── routes/
 │   │   ├── __init__.py ................... Package init
-│   │   ├── stock.py ...................... API Stock (300 lignes)
-│   │   ├── mouvements.py ................. API Mouvements (300 lignes)
-│   │   ├── parc.py ....................... API Parc (400 lignes)
-│   │   ├── locaux_it.py .................. API Locaux IT (350 lignes)
-│   │   └── utilisateurs.py ............... API Utilisateurs (100 lignes)
+│   │   ├── stock.py ...................... API Stock 
+│   │   ├── mouvements.py ................. API Mouvements 
+│   │   ├── parc.py ....................... API Parc 
+│   │   ├── locaux_it.py .................. API Locaux IT 
+│   │   └── utilisateurs.py ............... API Utilisateurs 
 │   │
 │   ├── utils/
 │   │   ├── __init__.py ................... Package init
-│   │   └── excel_helpers.py .............. Utilitaires Excel (100 lignes)
+│   │   └── excel_helpers.py .............. Utilitaires Excel 
 │   │
 │   ├── venv/ (créé après installation)
-│   │   └── ... (environnement Python virtuel)
+│   │   
 │   │
 │   ├── downloads/ (créé à l'usage)
 │   │   └── ... (fichiers Excel/CSV exportés)
@@ -69,24 +67,24 @@ gs parc/
 │   ├── src/
 │   │   │
 │   │   ├── Core
-│   │   │   ├── App.jsx ................... Composant principal (80 lignes)
-│   │   │   ├── api.js .................... Client API Axios (80 lignes)
+│   │   │   ├── App.jsx ................... Composant principal 
+│   │   │   ├── api.js .................... Client API Axios 
 │   │   │   ├── index.js .................. Point d'entrée
 │   │   │   ├── index.jsx ................. React DOM render
 │   │   │   └── index.css ................. Styles globaux
 │   │   │
 │   │   ├── pages/ (5 modules)
-│   │   │   ├── Dashboard.jsx ............ Tableau bord (120 lignes)
-│   │   │   ├── Stock.jsx ................ Module Stock (250 lignes)
-│   │   │   ├── Mouvements.jsx .......... Module Mouvements (280 lignes)
-│   │   │   ├── Parc.jsx ................. Module Parc (300 lignes)
-│   │   │   └── LocalsIT.jsx ............ Module Locaux IT (380 lignes)
+│   │   │   ├── Dashboard.jsx ............ Tableau bord 
+│   │   │   ├── Stock.jsx ................ Module Stock 
+│   │   │   ├── Mouvements.jsx .......... Module Mouvements 
+│   │   │   ├── Parc.jsx ................. Module Parc 
+│   │   │   └── LocalsIT.jsx ............ Module Locaux IT 
 │   │   │
 │   │   ├── components/
 │   │   │   └── Alerts.jsx ............... Composants UI réutilisables 
 │   │   │
 │   │   └──  utils/
-│   │       └── apiClient.js ............. Configuration API (30 lignes)
+│   │       └── apiClient.js ............. Configuration API 
 │   │
 │   ├── node_modules/ (créé après npm install)
 │   │   └── ... (dépendances npm)
@@ -95,7 +93,7 @@ gs parc/
 │       └── ... (version optimisée)
 │
 ├──   DATABASE
-│   └── schema.sql ........................ Schéma MySQL complet (150 lignes)
+│   └── schema.sql ........................ Schéma MySQL complet 
 │                                         7 tables + données de démo
 │
 └── STATISTICS

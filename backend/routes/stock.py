@@ -320,6 +320,30 @@ def get_stats():
     pc_fixe_count = db.session.query(db.func.sum(Stock.quantite)).filter(Stock.type_equipement.ilike('%pc fixe%')).scalar() or 0
     ipo_count = db.session.query(db.func.sum(Stock.quantite)).filter(Stock.type_equipement.ilike('%ipo%')).scalar() or 0
     
+    activite_labels = ['IMS', 'FSS', 'C2S', 'Commun']
+    activite_map = {
+        label: {'activite': label, 'pc_portable': 0, 'pc_fixe': 0, 'ipo': 0}
+        for label in activite_labels
+    }
+    activite_rows = db.session.query(
+        Stock.activite,
+        db.func.sum(
+            db.case((Stock.type_equipement.ilike('%pc portable%'), Stock.quantite), else_=0)
+        ).label('pc_portable'),
+        db.func.sum(
+            db.case((Stock.type_equipement.ilike('%pc fixe%'), Stock.quantite), else_=0)
+        ).label('pc_fixe'),
+        db.func.sum(
+            db.case((Stock.type_equipement.ilike('%ipo%'), Stock.quantite), else_=0)
+        ).label('ipo')
+    ).filter(Stock.activite.in_(activite_labels)).group_by(Stock.activite).all()
+
+    for row in activite_rows:
+        if row[0] in activite_map:
+            activite_map[row[0]]['pc_portable'] = int(row[1] or 0)
+            activite_map[row[0]]['pc_fixe'] = int(row[2] or 0)
+            activite_map[row[0]]['ipo'] = int(row[3] or 0)
+
     return jsonify({
         'stats': [
             {
@@ -329,6 +353,7 @@ def get_stats():
             } for s in stats
         ],
         'stats_by_equipment': list(breakdown_map.values()),
+        'stats_by_activite': list(activite_map.values()),
         'pc_portable': int(pc_portable_count),
         'pc_fixe': int(pc_fixe_count),
         'ipo': int(ipo_count)
