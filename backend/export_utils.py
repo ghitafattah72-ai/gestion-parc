@@ -5,7 +5,22 @@ import io
 import csv
 from datetime import datetime
 from openpyxl import Workbook
+from openpyxl.utils import get_column_letter
 from flask import send_file
+
+
+def _autosize_worksheet_columns(ws, max_width=60):
+    """Set a readable width for each used column based on content length."""
+    for column_cells in ws.columns:
+        max_length = 0
+        for cell in column_cells:
+            value = '' if cell.value is None else str(cell.value)
+            if len(value) > max_length:
+                max_length = len(value)
+
+        column_index = column_cells[0].column
+        column_letter = get_column_letter(column_index)
+        ws.column_dimensions[column_letter].width = min(max(max_length + 2, 10), max_width)
 
 
 def export_to_csv(headers, rows, filename):
@@ -51,6 +66,8 @@ def export_to_excel(headers, rows, filename, sheet_name='Data'):
     # Add data rows
     for row in rows:
         ws.append(row)
+
+    _autosize_worksheet_columns(ws)
     
     # Save to bytes
     output = io.BytesIO()
@@ -88,6 +105,8 @@ def export_to_excel_sheets(sheets, filename):
             ws.append(headers)
         for row in rows:
             ws.append(row)
+
+        _autosize_worksheet_columns(ws)
 
     output = io.BytesIO()
     wb.save(output)

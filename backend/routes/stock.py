@@ -12,6 +12,22 @@ from export_utils import export_to_csv, export_to_excel, get_export_filename
 
 stock_bp = Blueprint('stock', __name__, url_prefix='/api/stock')
 
+STOCK_IMPORT_TEMPLATE_HEADERS = [
+    'Name',
+    'Operating System - Name',
+    'Operating System - Version',
+    'Type',
+    'Model',
+    'Manufacturer',
+    'Processeur',
+    'N° de Série',
+    'RAM',
+    'Disque Dur',
+    'Activité',
+    'Quantité',
+    'État',
+]
+
 
 def _clean_value(value):
     if value is None:
@@ -31,6 +47,17 @@ def _first_value(row, aliases):
             if value is not None:
                 return value
     return None
+
+
+def _normalize_headers(columns):
+    return [(str(col).strip().lower() if col is not None else '') for col in columns]
+
+
+def _validate_template_headers(df_columns, expected_headers):
+    current = _normalize_headers(df_columns)
+    expected = _normalize_headers(expected_headers)
+    missing = [expected_headers[i] for i, h in enumerate(expected) if h not in current]
+    return missing
 
 # GET all stock items
 @stock_bp.route('/', methods=['GET'])
@@ -66,37 +93,31 @@ def get_stock_item(id):
 # POST new stock item
 @stock_bp.route('/', methods=['POST'])
 def create_stock_item():
-    data = request.json
-    
+    data = request.json or {}
     try:
-        # Check if equipment type requires detailed info
-        equipment_types_with_details = ['pc portable', 'pc fixe', 'ipo']
-        
+        resolved_type_stock = data.get('type_stock') or data.get('activite') or None
         new_item = Stock(
             nom_equipement=data.get('nom_equipement'),
             type_equipement=data.get('type_equipement'),
             quantite=data.get('quantite', 0),
-            type_stock=data.get('type_stock'),
-            etat=data.get('etat', 'nouveau')
+            type_stock=resolved_type_stock,
+            etat=data.get('etat', 'nouveau'),
+            alternate_username=data.get('alternate_username') or None,
+            systeme=data.get('systeme') or None,
+            os_version=data.get('os_version') or None,
+            stockage=data.get('stockage') or None,
+            manufacturer=data.get('manufacturer') or None,
+            processeur=data.get('processeur') or None,
+            numero_serie=data.get('numero_serie') or None,
+            ram=data.get('ram') or None,
+            disque_dur=data.get('disque_dur') or None,
+            emplacement=data.get('emplacement') or None,
+            activite=data.get('activite') or None,
+            service=data.get('service') or None,
         )
-        
-        # Add detailed info if PC type
-        if data.get('type_equipement') in equipment_types_with_details:
-            new_item.ram = data.get('ram')
-            new_item.stockage = data.get('stockage')
-            new_item.processeur = data.get('processeur')
-            new_item.numero_serie = data.get('numero_serie')
-            new_item.activite = data.get('activite')
-            new_item.systeme = data.get('systeme')
-            new_item.accessoires = data.get('accessoires')
-        
         db.session.add(new_item)
         db.session.commit()
-        
-        return jsonify({
-            'message': 'Stock item created successfully',
-            'item': item_to_dict(new_item)
-        }), 201
+        return jsonify({'message': 'Stock item created successfully', 'item': item_to_dict(new_item)}), 201
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 400
@@ -105,42 +126,29 @@ def create_stock_item():
 @stock_bp.route('/<int:id>', methods=['PUT'])
 def update_stock_item(id):
     item = Stock.query.get_or_404(id)
-    data = request.json
-
+    data = request.json or {}
     try:
-        equipment_types_with_details = ['pc portable', 'pc fixe', 'ipo']
-
+        resolved_type_stock = data.get('type_stock') or data.get('activite') or item.type_stock
         item.nom_equipement = data.get('nom_equipement', item.nom_equipement)
         item.type_equipement = data.get('type_equipement', item.type_equipement)
         item.quantite = data.get('quantite', item.quantite)
-        item.type_stock = data.get('type_stock', item.type_stock)
+        item.type_stock = resolved_type_stock
         item.etat = data.get('etat', item.etat)
-
-        if item.type_equipement in equipment_types_with_details:
-            item.ram = data.get('ram', item.ram)
-            item.stockage = data.get('stockage', item.stockage)
-            item.processeur = data.get('processeur', item.processeur)
-            item.numero_serie = data.get('numero_serie', item.numero_serie)
-            item.activite = data.get('activite', item.activite)
-            item.systeme = data.get('systeme', item.systeme)
-            item.accessoires = data.get('accessoires', item.accessoires)
-        else:
-            item.ram = None
-            item.stockage = None
-            item.processeur = None
-            item.numero_serie = None
-            item.activite = None
-            item.systeme = None
-            item.accessoires = None
-
+        item.alternate_username = data.get('alternate_username') or None
+        item.systeme = data.get('systeme') or None
+        item.os_version = data.get('os_version') or None
+        item.stockage = data.get('stockage') or None
+        item.manufacturer = data.get('manufacturer') or None
+        item.processeur = data.get('processeur') or None
+        item.numero_serie = data.get('numero_serie') or None
+        item.ram = data.get('ram') or None
+        item.disque_dur = data.get('disque_dur') or None
+        item.emplacement = data.get('emplacement') or None
+        item.activite = data.get('activite') or None
+        item.service = data.get('service') or None
         item.date_modification = datetime.utcnow()
-
         db.session.commit()
-
-        return jsonify({
-            'message': 'Stock item updated successfully',
-            'item': item_to_dict(item)
-        })
+        return jsonify({'message': 'Stock item updated successfully', 'item': item_to_dict(item)})
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 400
@@ -160,6 +168,19 @@ def delete_stock_item(id):
 
 
 # IMPORT stock from Excel/CSV
+@stock_bp.route('/import-template', methods=['GET'])
+@check_permission('import')
+def export_stock_import_template():
+    format_type = (request.args.get('format', 'xlsx') or 'xlsx').lower()
+    if format_type not in ['csv', 'xlsx']:
+        return jsonify({'error': 'Invalid format. Use csv or xlsx'}), 400
+
+    filename = get_export_filename('stock_import_template', format_type)
+    if format_type == 'xlsx':
+        return export_to_excel(STOCK_IMPORT_TEMPLATE_HEADERS, [], filename, sheet_name='Template_Stock')
+    return export_to_csv(STOCK_IMPORT_TEMPLATE_HEADERS, [], filename)
+
+
 @stock_bp.route('/import', methods=['POST'])
 @check_permission('import')
 def import_stock():
@@ -180,28 +201,36 @@ def import_stock():
         else:
             return jsonify({'error': 'File format not supported'}), 400
 
-        equipment_types_with_details = ['pc portable', 'pc fixe', 'ipo']
+        missing_headers = _validate_template_headers(df.columns, STOCK_IMPORT_TEMPLATE_HEADERS)
+        if missing_headers:
+            return jsonify({
+                'error': 'Template invalide. Utilisez le template officiel.',
+                'missing_headers': missing_headers,
+                'expected_headers': STOCK_IMPORT_TEMPLATE_HEADERS,
+            }), 400
+
         imported_count = 0
         errors = []
 
         for index, row in df.iterrows():
             try:
-                nom_equipement = _first_value(row, ['Nom', 'nom', 'Nom équipement', 'Nom equipement', 'nom_equipement'])
-                type_equipement = _first_value(row, ['Type Équipement', 'Type equipement', 'Type', 'type_equipement'])
-                type_stock = _first_value(row, ['Type Stock', 'type_stock'])
-                etat = _first_value(row, ['État', 'Etat', 'etat']) or 'nouveau'
-                numero_serie = _first_value(row, ['N° Série', 'N° de série', 'Numero de série', 'Numero serie', 'numero_serie'])
+                nom_equipement = _first_value(row, ['Name', 'Nom'])
+                type_equipement = _first_value(row, ['Type'])
+                activite = _first_value(row, ['Activité', 'Activitée', 'Activité C2S/IMS/FSS'])
+                type_stock = activite
+                etat = _first_value(row, ['État', 'Etat']) or 'nouveau'
 
-                quantite_value = _first_value(row, ['Quantité', 'Quantite', 'quantite'])
+                quantite_value = _first_value(row, ['Quantité', 'Quantite'])
                 try:
                     quantite = int(float(quantite_value)) if quantite_value is not None else 0
                 except Exception:
                     quantite = 0
 
-                if not nom_equipement or not type_equipement or not type_stock:
-                    errors.append(f'Row {index + 1}: nom_equipement, type_equipement et type_stock sont obligatoires')
+                if not nom_equipement or not type_equipement or not activite:
+                    errors.append(f'Row {index + 1}: Name, Type et Activité sont obligatoires')
                     continue
 
+                numero_serie = _first_value(row, ['N° de Série', 'N° Série', 'Numero du serie'])
                 existing = Stock.query.filter_by(numero_serie=numero_serie).first() if numero_serie else None
 
                 payload = {
@@ -210,37 +239,24 @@ def import_stock():
                     'quantite': quantite,
                     'type_stock': type_stock,
                     'etat': etat,
-                    'ram': _first_value(row, ['RAM', 'ram']),
-                    'stockage': _first_value(row, ['Stockage', 'stockage']),
-                    'processeur': _first_value(row, ['Processeur', 'processeur']),
+                    'alternate_username': None,
+                    'systeme': _first_value(row, ['Operating System - Name', 'Système', 'Systeme', 'Système d\'exploitation']),
+                    'os_version': _first_value(row, ['Operating System - Version']),
+                    'stockage': _first_value(row, ['Model']),
+                    'manufacturer': _first_value(row, ['Manufacturer']),
+                    'processeur': _first_value(row, ['Processeur']),
                     'numero_serie': numero_serie,
-                    'activite': _first_value(row, ['Activité', 'Activite', 'activite']),
-                    'systeme': _first_value(row, ['Système', 'Systeme', 'systeme']),
-                    'accessoires': _first_value(row, ['Accessoires', 'accessoires']),
+                    'ram': _first_value(row, ['RAM']),
+                    'disque_dur': _first_value(row, ['Disque Dur']),
+                    'emplacement': None,
+                    'activite': activite,
+                    'service': None,
+                    'accessoires': None,
                 }
 
-                if payload['type_equipement'].lower() not in equipment_types_with_details:
-                    payload['ram'] = None
-                    payload['stockage'] = None
-                    payload['processeur'] = None
-                    payload['numero_serie'] = None
-                    payload['activite'] = None
-                    payload['systeme'] = None
-                    payload['accessoires'] = None
-
                 if existing:
-                    existing.nom_equipement = payload['nom_equipement']
-                    existing.type_equipement = payload['type_equipement']
-                    existing.quantite = payload['quantite']
-                    existing.type_stock = payload['type_stock']
-                    existing.etat = payload['etat']
-                    existing.ram = payload['ram']
-                    existing.stockage = payload['stockage']
-                    existing.processeur = payload['processeur']
-                    existing.numero_serie = payload['numero_serie']
-                    existing.activite = payload['activite']
-                    existing.systeme = payload['systeme']
-                    existing.accessoires = payload['accessoires']
+                    for k, v in payload.items():
+                        setattr(existing, k, v)
                     existing.date_modification = datetime.utcnow()
                 else:
                     db.session.add(Stock(**payload))
@@ -373,14 +389,36 @@ def export_stock():
     items = query.all()
     
     # Prepare headers and data rows
-    headers = ['ID', 'Nom', 'Type Équipement', 'Quantité', 'Type Stock', 'État', 
-               'RAM', 'Stockage', 'Processeur', 'N° Série', 'Activité', 'Système', 'Accessoires']
-    
+    headers = [
+        'Name',
+        'Operating System - Name',
+        'Operating System - Version',
+        'Type',
+        'Model',
+        'Manufacturer',
+        'Processeur',
+        'N° de Série',
+        'RAM',
+        'Disque Dur',
+        'Activité',
+        'Quantité',
+        'État',
+    ]
+
     rows = [[
-        item.id, item.nom_equipement, item.type_equipement, item.quantite,
-        item.type_stock, item.etat, item.ram or '', item.stockage or '',
-        item.processeur or '', item.numero_serie or '', item.activite or '',
-        item.systeme or '', item.accessoires or ''
+        item.nom_equipement or '',
+        item.systeme or '',
+        item.os_version or '',
+        item.type_equipement or '',
+        item.stockage or '',
+        item.manufacturer or '',
+        item.processeur or '',
+        item.numero_serie or '',
+        item.ram or '',
+        item.disque_dur or '',
+        item.activite or item.type_stock or '',
+        item.quantite,
+        item.etat or '',
     ] for item in items]
     
     # Generate filename
@@ -400,13 +438,18 @@ def item_to_dict(item):
         'quantite': item.quantite,
         'type_stock': item.type_stock,
         'etat': item.etat,
-        'ram': item.ram,
+        'alternate_username': item.alternate_username,
+        'systeme': item.systeme,
+        'os_version': item.os_version,
         'stockage': item.stockage,
+        'manufacturer': item.manufacturer,
         'processeur': item.processeur,
         'numero_serie': item.numero_serie,
+        'ram': item.ram,
+        'disque_dur': item.disque_dur,
+        'emplacement': item.emplacement,
         'activite': item.activite,
-        'systeme': item.systeme,
-        'accessoires': item.accessoires,
+        'service': item.service,
         'date_creation': item.date_creation.isoformat(),
         'date_modification': item.date_modification.isoformat()
     }

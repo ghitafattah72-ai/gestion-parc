@@ -78,11 +78,73 @@ def get_mouvements():
         'current_page': page
     })
 
+
+@mouvements_bp.route('/dechets', methods=['GET'])
+def get_dechets():
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    search = (request.args.get('search') or '').strip()
+
+    query = Mouvement.query.filter(
+        Mouvement.type_mouvement == 'sortie',
+        db.func.lower(Mouvement.local_it_destination) == 'dechet',
+    )
+
+    if search:
+        term = f'%{search}%'
+        query = query.filter(
+            Mouvement.nom_equipement.ilike(term)
+            | Mouvement.type_equipement.ilike(term)
+            | Mouvement.numero_serie.ilike(term)
+            | Mouvement.type_stock.ilike(term)
+        )
+
+    items = query.order_by(Mouvement.date_mouvement.desc()).paginate(page=page, per_page=per_page)
+
+    return jsonify({
+        'items': [mouvement_to_dict(item) for item in items.items],
+        'total': items.total,
+        'pages': items.pages,
+        'current_page': page,
+    })
+
 # GET single movement
 @mouvements_bp.route('/<int:id>', methods=['GET'])
 def get_mouvement(id):
     item = Mouvement.query.get_or_404(id)
     return jsonify(mouvement_to_dict(item))
+
+
+@mouvements_bp.route('/<int:id>', methods=['PUT'])
+@jwt_required()
+def update_mouvement(id):
+    admin_user = _require_admin_user()
+    if admin_user is None:
+        return jsonify({'error': 'Utilisateur non authentifié'}), 401
+    if admin_user is False:
+        return jsonify({'error': 'Autorisation refusée'}), 403
+
+    item = Mouvement.query.get_or_404(id)
+    data = request.json or {}
+
+    try:
+        new_activite = (data.get('activite') or '').strip()
+        new_description = (data.get('description') or '').strip()
+
+        if item.type_mouvement == 'sortie' and not new_activite:
+            return jsonify({'error': 'Activité obligatoire pour une sortie'}), 400
+
+        item.activite = new_activite or None
+        item.description = new_description or None
+
+        db.session.commit()
+        return jsonify({
+            'message': 'Mouvement modifié avec succès',
+            'mouvement': mouvement_to_dict(item),
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
 
 
 @mouvements_bp.route('/sources/stock', methods=['GET'])
@@ -115,11 +177,15 @@ def get_stock_sources():
             'type_equipement': item.type_equipement,
             'type_stock': item.type_stock,
             'quantite': item.quantite,
+            'etat': item.etat,
             'model_equipement': item.stockage,
             'numero_serie': item.numero_serie,
             'ram': item.ram,
             'processeur': item.processeur,
             'systeme': item.systeme,
+            'os_version': item.os_version,
+            'manufacturer': item.manufacturer,
+            'disque_dur': item.disque_dur,
             'accessoires': item.accessoires,
             'activite': item.activite,
         }
@@ -160,8 +226,15 @@ def get_parc_sources():
             'ram': item.ram,
             'processeur': item.processeur,
             'systeme': item.os_name,
+            'os_version': item.os_version,
+            'alternate_username': item.alternate_username,
+            'manufacturer': item.manufacturer,
+            'disque_dur': item.disque_dur,
+            'emplacement': item.emplacement,
+            'service': item.service,
+            'quantite': item.quantite,
             'accessoires': None,
-            'activite': item.esu,
+            'activite': item.activite,
         }
         for item in items
     ])
@@ -182,10 +255,21 @@ def create_mouvement():
         quantite = _to_positive_int(data.get('quantite', 0))
         model_equipement = (data.get('model_equipement') or '').strip()
         numero_serie = (data.get('numero_serie') or '').strip()
+        etat = (data.get('etat') or 'nouveau').strip() or 'nouveau'
+        ram = (data.get('ram') or '').strip()
+        processeur = (data.get('processeur') or '').strip()
+        systeme = (data.get('systeme') or '').strip()
         activite = (data.get('activite') or '').strip()
+        alternate_username = (data.get('alternate_username') or '').strip()
+        os_version = (data.get('os_version') or '').strip()
+        manufacturer = (data.get('manufacturer') or '').strip()
+        disque_dur = (data.get('disque_dur') or '').strip()
+        emplacement = (data.get('emplacement') or '').strip()
+        service = (data.get('service') or '').strip()
         description = (data.get('description') or '').strip()
         stock_item_id = _to_int(data.get('stock_item_id'))
         parc_item_id = _to_int(data.get('parc_item_id'))
+        sortie_mode = (data.get('sortie_mode') or 'vers_parc').strip().lower()
 
         if not quantite:
             return jsonify({'error': 'Quantité invalide'}), 400
@@ -194,6 +278,9 @@ def create_mouvement():
         date_mouvement = datetime.utcnow()
         stock_item = None
         parc_item = None
+
+        if type_mouvement == 'sortie' and sortie_mode not in ['vers_parc', 'dechet']:
+            return jsonify({'error': 'Mode de sortie invalide'}), 400
 
         if type_mouvement == 'entrée':
             source_entree = (data.get('source_entree') or '').strip().lower()
@@ -222,6 +309,17 @@ def create_mouvement():
                 type_equipement = parc_item.type
                 model_equipement = parc_item.model or ''
                 numero_serie = parc_item.numero_serie or ''
+                ram = parc_item.ram or ''
+                processeur = parc_item.processeur or ''
+                systeme = parc_item.os_name or ''
+                alternate_username = parc_item.alternate_username or ''
+                os_version = parc_item.os_version or ''
+                manufacturer = parc_item.manufacturer or ''
+                disque_dur = parc_item.disque_dur or ''
+                emplacement = parc_item.emplacement or ''
+                service = parc_item.service or ''
+                activite = activite or (parc_item.activite or '')
+                quantite = 1
 
                 if not type_stock:
                     return jsonify({'error': 'Type stock destination obligatoire'}), 400
@@ -230,7 +328,7 @@ def create_mouvement():
                 if not nom_equipement or not type_equipement or not type_stock:
                     return jsonify({'error': 'Pour achat, nom, type matériel et type stock sont obligatoires'}), 400
 
-        if type_mouvement == 'sortie' and not activite:
+        if type_mouvement == 'sortie' and sortie_mode == 'vers_parc' and not activite:
             return jsonify({'error': 'Activité obligatoire pour une sortie'}), 400
 
         if type_mouvement == 'sortie':
@@ -254,9 +352,13 @@ def create_mouvement():
             type_stock = stock_item.type_stock
             model_equipement = model_equipement or stock_item.stockage or ''
             numero_serie = numero_serie or stock_item.numero_serie or ''
-
-            if numero_serie and quantite > 1:
-                return jsonify({'error': 'Avec numéro de série, la quantité doit être 1'}), 400
+            ram = ram or stock_item.ram or ''
+            processeur = processeur or stock_item.processeur or ''
+            systeme = systeme or stock_item.systeme or ''
+            os_version = os_version or stock_item.os_version or ''
+            manufacturer = manufacturer or stock_item.manufacturer or ''
+            disque_dur = disque_dur or stock_item.disque_dur or stock_item.stockage or ''
+            etat = etat or stock_item.etat or 'nouveau'
 
         new_mouvement = Mouvement(
             type_mouvement=type_mouvement,
@@ -264,10 +366,13 @@ def create_mouvement():
             type_equipement=type_equipement,
             quantite=quantite,
             type_stock=type_stock,
-            local_it_destination='parc' if type_mouvement == 'sortie' else source_entree,
+            local_it_destination=(sortie_mode if type_mouvement == 'sortie' else source_entree),
             baie_destination=None,
             stockage=model_equipement,
+            ram=ram or None,
+            processeur=processeur or None,
             numero_serie=numero_serie,
+            systeme=systeme or None,
             activite=activite or None,
             description=description,
             date_mouvement=date_mouvement,
@@ -288,6 +393,13 @@ def create_mouvement():
                 stock_item.type_equipement = type_equipement
                 stock_item.stockage = model_equipement or stock_item.stockage
                 stock_item.numero_serie = numero_serie or stock_item.numero_serie
+                stock_item.ram = ram or stock_item.ram
+                stock_item.processeur = processeur or stock_item.processeur
+                stock_item.systeme = systeme or stock_item.systeme
+                stock_item.os_version = os_version or stock_item.os_version
+                stock_item.manufacturer = manufacturer or stock_item.manufacturer
+                stock_item.disque_dur = disque_dur or stock_item.disque_dur
+                stock_item.etat = etat or stock_item.etat
                 stock_item.activite = activite or stock_item.activite
                 stock_item.date_modification = datetime.utcnow()
             else:
@@ -296,9 +408,15 @@ def create_mouvement():
                     type_equipement=type_equipement,
                     quantite=quantite,
                     type_stock=type_stock,
-                    etat='nouveau',
+                    etat=etat or 'nouveau',
                     stockage=model_equipement,
                     numero_serie=numero_serie,
+                    ram=ram or None,
+                    processeur=processeur or None,
+                    systeme=systeme or None,
+                    os_version=os_version or None,
+                    manufacturer=manufacturer or None,
+                    disque_dur=disque_dur or None,
                     activite=activite or None,
                 )
                 db.session.add(stock_item)
@@ -311,26 +429,46 @@ def create_mouvement():
             stock_item.activite = activite
             stock_item.date_modification = datetime.utcnow()
 
-            for index in range(quantite):
-                parc_numero_serie = numero_serie if index == 0 else None
+            if sortie_mode == 'vers_parc':
+                parc_item = None
+                if numero_serie:
+                    parc_item = Parc.query.filter_by(numero_serie=numero_serie).first()
 
-                if parc_numero_serie:
-                    duplicate_serial = Parc.query.filter_by(numero_serie=parc_numero_serie).first()
-                    if duplicate_serial:
-                        db.session.rollback()
-                        return jsonify({'error': 'Le numéro de série existe déjà dans le parc'}), 400
-
-                parc_item = Parc(
-                    name=nom_equipement,
-                    type=type_equipement,
-                    model=model_equipement or None,
-                    numero_serie=parc_numero_serie,
-                    processeur=stock_item.processeur,
-                    ram=stock_item.ram,
-                    disque_dur=stock_item.stockage,
-                    esu=activite or None,
-                )
-                db.session.add(parc_item)
+                if parc_item:
+                    parc_item.name = nom_equipement
+                    parc_item.alternate_username = alternate_username or parc_item.alternate_username
+                    parc_item.os_name = systeme or parc_item.os_name
+                    parc_item.os_version = os_version or parc_item.os_version
+                    parc_item.type = type_equipement
+                    parc_item.model = model_equipement or parc_item.model
+                    parc_item.manufacturer = manufacturer or parc_item.manufacturer
+                    parc_item.processeur = processeur or parc_item.processeur
+                    parc_item.ram = ram or parc_item.ram
+                    parc_item.disque_dur = disque_dur or parc_item.disque_dur or stock_item.stockage
+                    parc_item.emplacement = emplacement or parc_item.emplacement
+                    parc_item.service = service or parc_item.service
+                    parc_item.activite = activite or parc_item.activite
+                    parc_item.quantite = (parc_item.quantite or 0) + quantite
+                    parc_item.date_modification = datetime.utcnow()
+                else:
+                    parc_item = Parc(
+                        name=nom_equipement,
+                        alternate_username=alternate_username or None,
+                        os_name=systeme or None,
+                        os_version=os_version or None,
+                        type=type_equipement,
+                        model=model_equipement or None,
+                        manufacturer=manufacturer or None,
+                        numero_serie=numero_serie or None,
+                        processeur=processeur or stock_item.processeur,
+                        ram=ram or stock_item.ram,
+                        disque_dur=disque_dur or stock_item.disque_dur or stock_item.stockage,
+                        emplacement=emplacement or None,
+                        service=service or None,
+                        activite=activite or None,
+                        quantite=quantite,
+                    )
+                    db.session.add(parc_item)
 
         db.session.commit()
 

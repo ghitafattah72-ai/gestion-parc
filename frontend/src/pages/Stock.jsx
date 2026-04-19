@@ -3,16 +3,15 @@ import { stockAPI } from '../api';
 import { Trash2, Download, Search, Pencil, Upload } from 'lucide-react';
 import { RestrictedButton } from '../components/ProtectedRoute';
 import { useAuth } from '../context/AuthContext';
-import { handleExportFile } from '../utils/fileExport';
-import { EQUIPMENT_TYPES_WITH_DETAILS, STOCK_TYPES } from '../constants';
+import { downloadFile, handleExportFile } from '../utils/fileExport';
 
 const equipmentTypes = [
   'pc portable', 'pc fixe', 'ipo', 'imprimante', 'étiquette', 'imprimante A4',
   'imprimante location', 'imprimante traceur', 'écran', 'câble', 'souris filaire',
-  'clavier filaire', 'souris sans fil', 'clavier et souris filaire', 'douchettes', 'casque', 'autre'
+  'clavier filaire', 'souris sans fil', 'clavier et souris filaire', 'douchettes', 'casque',
+  'Toner-xerbox', 'Toner-Konic Puce', 'Toner-Konic sans Puce', 'autre'
 ];
 
-const typeStocks = ['FSS', 'IMS', 'C2S', 'Commun'];
 const activiteOptions = ['FSS', 'IMS', 'C2S', 'Commun'];
 
 export default function Stock() {
@@ -28,17 +27,18 @@ export default function Stock() {
 
   const [formData, setFormData] = useState({
     nom_equipement: '',
+    systeme: '',
+    os_version: '',
     type_equipement: '',
-    quantite: 0,
-    type_stock: '',
-    etat: 'nouveau',
-    ram: '',
     stockage: '',
+    manufacturer: '',
     processeur: '',
     numero_serie: '',
+    ram: '',
+    disque_dur: '',
     activite: '',
-    systeme: '',
-    accessoires: '',
+    quantite: 0,
+    etat: 'nouveau',
   });
 
   useEffect(() => {
@@ -62,17 +62,18 @@ export default function Stock() {
   const resetForm = () => {
     setFormData({
       nom_equipement: '',
+      systeme: '',
+      os_version: '',
       type_equipement: '',
-      quantite: 0,
-      type_stock: '',
-      etat: 'nouveau',
-      ram: '',
       stockage: '',
+      manufacturer: '',
       processeur: '',
       numero_serie: '',
+      ram: '',
+      disque_dur: '',
       activite: '',
-      systeme: '',
-      accessoires: '',
+      quantite: 0,
+      etat: 'nouveau',
     });
     setEditingId(null);
   };
@@ -80,17 +81,22 @@ export default function Stock() {
   const handleSaveItem = async (e) => {
     e.preventDefault();
     
-    if (!formData.nom_equipement || !formData.type_equipement || !formData.type_stock) {
+    if (!formData.nom_equipement || !formData.type_equipement || !formData.activite) {
       alert('Veuillez remplir les champs obligatoires');
       return;
     }
 
     try {
+      const payload = {
+        ...formData,
+        type_stock: formData.activite,
+      };
+
       if (editingId) {
-        await stockAPI.update(editingId, formData);
+        await stockAPI.update(editingId, payload);
         alert('Équipement modifié avec succès');
       } else {
-        await stockAPI.create(formData);
+        await stockAPI.create(payload);
         alert('Équipement ajouté avec succès');
       }
       resetForm();
@@ -105,17 +111,18 @@ export default function Stock() {
   const handleEdit = (item) => {
     setFormData({
       nom_equipement: item.nom_equipement || '',
+      systeme: item.systeme || '',
+      os_version: item.os_version || '',
       type_equipement: item.type_equipement || '',
-      quantite: item.quantite ?? 0,
-      type_stock: item.type_stock || '',
-      etat: item.etat || 'nouveau',
-      ram: item.ram || '',
       stockage: item.stockage || '',
+      manufacturer: item.manufacturer || '',
       processeur: item.processeur || '',
       numero_serie: item.numero_serie || '',
-      activite: item.activite || '',
-      systeme: item.systeme || '',
-      accessoires: item.accessoires || '',
+      ram: item.ram || '',
+      disque_dur: item.disque_dur || '',
+      activite: item.activite || item.type_stock || '',
+      quantite: item.quantite ?? 0,
+      etat: item.etat || 'nouveau',
     });
     setEditingId(item.id);
     setShowForm(true);
@@ -162,6 +169,17 @@ export default function Stock() {
     }
   };
 
+  const handleDownloadTemplate = async (format = 'xlsx') => {
+    try {
+      const res = await stockAPI.importTemplate(format);
+      const extension = format === 'csv' ? 'csv' : 'xlsx';
+      downloadFile(res.data, `stock_import_template.${extension}`);
+    } catch (error) {
+      console.error('Erreur template stock:', error);
+      alert('Erreur lors du téléchargement du template');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="rounded-[28px] bg-gradient-to-r from-slate-900 to-slate-700 p-6 text-white shadow-lg">
@@ -185,6 +203,13 @@ export default function Stock() {
                 disabled={!hasPermission('import')}
               />
             </label>
+            <RestrictedButton
+              onClick={() => handleDownloadTemplate('xlsx')}
+              requiredAction="import"
+              className="flex items-center gap-2 rounded-full bg-violet-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-800"
+            >
+              <Download size={18} /> Template
+            </RestrictedButton>
             <RestrictedButton
               onClick={() => handleExport('csv')}
               requiredAction="export"
@@ -228,7 +253,7 @@ export default function Stock() {
             className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-700 outline-none"
           >
             <option value="">Tous les types</option>
-            {typeStocks.map(type => (
+            {activiteOptions.map(type => (
               <option key={type} value={type}>{type}</option>
             ))}
           </select>
@@ -241,86 +266,60 @@ export default function Stock() {
           <h3 className="text-xl font-bold mb-4">Modifier l'équipement</h3>
           <form onSubmit={handleSaveItem} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <input
-                type="text"
-                placeholder="Nom équipement"
-                value={formData.nom_equipement}
+              <input type="text" placeholder="Name" value={formData.nom_equipement}
                 onChange={(e) => setFormData({ ...formData, nom_equipement: e.target.value })}
-                className="p-2 border rounded"
-                required
-              />
-              <select
-                value={formData.type_equipement}
+                className="p-2 border rounded" required />
+              <input type="text" placeholder="Operating System - Name" value={formData.systeme}
+                onChange={(e) => setFormData({ ...formData, systeme: e.target.value })}
+                className="p-2 border rounded" />
+              <input type="text" placeholder="Operating System - Version" value={formData.os_version}
+                onChange={(e) => setFormData({ ...formData, os_version: e.target.value })}
+                className="p-2 border rounded" />
+              <select value={formData.type_equipement}
                 onChange={(e) => setFormData({ ...formData, type_equipement: e.target.value })}
-                className="p-2 border rounded"
-                required
-              >
+                className="p-2 border rounded" required>
                 <option value="">Sélectionner type équipement</option>
-                {equipmentTypes.map(type => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
+                {equipmentTypes.map(type => (<option key={type} value={type}>{type}</option>))}
               </select>
-
-              <input
-                type="text"
-                placeholder="Model"
-                value={formData.stockage}
+              <input type="text" placeholder="Model" value={formData.stockage}
                 onChange={(e) => setFormData({ ...formData, stockage: e.target.value })}
-                className="p-2 border rounded"
-              />
-              <input
-                type="text"
-                placeholder="Numero du serie"
-                value={formData.numero_serie}
+                className="p-2 border rounded" />
+              <input type="text" placeholder="Manufacturer" value={formData.manufacturer}
+                onChange={(e) => setFormData({ ...formData, manufacturer: e.target.value })}
+                className="p-2 border rounded" />
+              <input type="text" placeholder="Processeur" value={formData.processeur}
+                onChange={(e) => setFormData({ ...formData, processeur: e.target.value })}
+                className="p-2 border rounded" />
+              <input type="text" placeholder="N° de Série" value={formData.numero_serie}
                 onChange={(e) => setFormData({ ...formData, numero_serie: e.target.value })}
-                className="p-2 border rounded"
-              />
-
-              <input
-                type="number"
-                placeholder="Quantité"
-                value={formData.quantite}
-                onChange={(e) => setFormData({ ...formData, quantite: parseInt(e.target.value) })}
-                className="p-2 border rounded"
-              />
-              <select
-                value={formData.type_stock}
-                onChange={(e) => setFormData({ ...formData, type_stock: e.target.value })}
-                className="p-2 border rounded"
-                required
-              >
-                <option value="">Sélectionner type stock</option>
-                {typeStocks.map(type => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
-              </select>
-
-              <select
-                value={formData.activite}
+                className="p-2 border rounded" />
+              <input type="text" placeholder="RAM" value={formData.ram}
+                onChange={(e) => setFormData({ ...formData, ram: e.target.value })}
+                className="p-2 border rounded" />
+              <input type="text" placeholder="Disque Dur" value={formData.disque_dur}
+                onChange={(e) => setFormData({ ...formData, disque_dur: e.target.value })}
+                className="p-2 border rounded" />
+              <select value={formData.activite}
                 onChange={(e) => setFormData({ ...formData, activite: e.target.value })}
-                className="p-2 border rounded"
-              >
-                <option value="">Selectionner activitee</option>
-                {activiteOptions.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
+                className="p-2 border rounded" required>
+                <option value="">Activité</option>
+                {activiteOptions.map((option) => (<option key={option} value={option}>{option}</option>))}
+              </select>
+              <input type="number" placeholder="Quantité" value={formData.quantite}
+                onChange={(e) => setFormData({ ...formData, quantite: parseInt(e.target.value, 10) || 0 })}
+                className="p-2 border rounded" />
+              <select value={formData.etat}
+                onChange={(e) => setFormData({ ...formData, etat: e.target.value })}
+                className="p-2 border rounded">
+                <option value="nouveau">Nouveau</option>
+                <option value="occasion bon état">Occasion bon état</option>
+                <option value="occasion mauvaise état">Occasion mauvaise état</option>
+                <option value="en panne">En panne</option>
               </select>
             </div>
-
             <div className="flex gap-2 justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  resetForm();
-                  setShowForm(false);
-                }}
-                className="px-4 py-2 bg-gray-300 rounded"
-              >
-                Annuler
-              </button>
-              <button type="submit" className="px-4 py-2 bg-blue-500 text-white rounded">
-                Modifier
-              </button>
+              <button type="button" onClick={() => { resetForm(); setShowForm(false); }} className="px-4 py-2 bg-gray-300 rounded">Annuler</button>
+              <button type="submit" className="px-4 py-2 bg-blue-500 text-white rounded">Modifier</button>
             </div>
           </form>
         </div>
@@ -331,31 +330,43 @@ export default function Stock() {
         <table className="w-full text-sm">
           <thead className="bg-gray-100 border-b">
             <tr>
-              <th className="p-3 text-left">Nom</th>
+              <th className="p-3 text-left">Name</th>
+              <th className="p-3 text-left">Operating System - Name</th>
+              <th className="p-3 text-left">Operating System - Version</th>
               <th className="p-3 text-left">Type</th>
               <th className="p-3 text-left">Model</th>
-              <th className="p-3 text-left">Numero du serie</th>
+              <th className="p-3 text-left">Manufacturer</th>
+              <th className="p-3 text-left">Processeur</th>
+              <th className="p-3 text-left">N° de Série</th>
+              <th className="p-3 text-left">RAM</th>
+              <th className="p-3 text-left">Disque Dur</th>
+              <th className="p-3 text-left">Activité</th>
               <th className="p-3 text-left">Quantité</th>
-              <th className="p-3 text-left">Type Stock</th>
-              <th className="p-3 text-left">Activitée</th>
+              <th className="p-3 text-left">État</th>
               <th className="p-3 text-left">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="8" className="p-3 text-center">Chargement...</td></tr>
+              <tr><td colSpan="14" className="p-3 text-center">Chargement...</td></tr>
             ) : items.length === 0 ? (
-              <tr><td colSpan="8" className="p-3 text-center">Aucun équipement trouvé</td></tr>
+              <tr><td colSpan="14" className="p-3 text-center">Aucun équipement trouvé</td></tr>
             ) : (
               items.map(item => (
                 <tr key={item.id} className="border-b hover:bg-gray-50">
                   <td className="p-3">{item.nom_equipement}</td>
+                  <td className="p-3">{item.systeme || '-'}</td>
+                  <td className="p-3">{item.os_version || '-'}</td>
                   <td className="p-3">{item.type_equipement}</td>
                   <td className="p-3">{item.stockage || '-'}</td>
+                  <td className="p-3">{item.manufacturer || '-'}</td>
+                  <td className="p-3">{item.processeur || '-'}</td>
                   <td className="p-3">{item.numero_serie || '-'}</td>
+                  <td className="p-3">{item.ram || '-'}</td>
+                  <td className="p-3">{item.disque_dur || '-'}</td>
+                  <td className="p-3">{item.activite || item.type_stock || '-'}</td>
                   <td className="p-3">{item.quantite}</td>
-                  <td className="p-3">{item.type_stock}</td>
-                  <td className="p-3">{item.activite || '-'}</td>
+                  <td className="p-3">{item.etat || '-'}</td>
                   <td className="p-3">
                     <RestrictedButton
                       onClick={() => handleEdit(item)}

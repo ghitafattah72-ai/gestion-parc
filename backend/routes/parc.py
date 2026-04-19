@@ -7,6 +7,24 @@ from export_utils import export_to_csv, export_to_excel, get_export_filename
 
 parc_bp = Blueprint('parc', __name__, url_prefix='/api/parc')
 
+PARC_IMPORT_TEMPLATE_HEADERS = [
+    'Name',
+    'Alternate username',
+    'Operating System - Name',
+    'Operating System - Version',
+    'Type',
+    'Model',
+    'Manufacturer',
+    'Processeur',
+    'N° de Série',
+    'RAM',
+    'Disque Dur',
+    'Emplacement',
+    'Activité',
+    'Service',
+    'Quantité',
+]
+
 PARC_EXPORT_HEADERS = [
     'Name',
     'Alternate username',
@@ -14,15 +32,15 @@ PARC_EXPORT_HEADERS = [
     'Operating System - Version',
     'Type',
     'Model',
-    'Version',
     'Manufacturer',
-    'N° de série',
     'Processeur',
+    'N° de Série',
     'RAM',
-    'Disque dur',
+    'Disque Dur',
     'Emplacement',
+    'Activité',
     'Service',
-    'ESU',
+    'Quantité',
 ]
 
 
@@ -50,6 +68,17 @@ def _payload_value(data, key):
     if not data:
         return None
     return _clean_value(data.get(key))
+
+
+def _normalize_headers(columns):
+    return [(str(col).strip().lower() if col is not None else '') for col in columns]
+
+
+def _validate_template_headers(df_columns, expected_headers):
+    current = _normalize_headers(df_columns)
+    expected = _normalize_headers(expected_headers)
+    missing = [expected_headers[i] for i, h in enumerate(expected) if h not in current]
+    return missing
 
 # GET all parc items
 @parc_bp.route('/', methods=['GET'])
@@ -208,6 +237,19 @@ def delete_parc_item(id):
         return jsonify({'error': str(e)}), 400
 
 # IMPORT parc from Excel/CSV
+@parc_bp.route('/import-template', methods=['GET'])
+@check_permission('import')
+def export_parc_import_template():
+    format_type = (request.args.get('format', 'xlsx') or 'xlsx').lower()
+    if format_type not in ['csv', 'xlsx']:
+        return jsonify({'error': 'Invalid format. Use csv or xlsx'}), 400
+
+    filename = get_export_filename('parc_import_template', format_type)
+    if format_type == 'xlsx':
+        return export_to_excel(PARC_IMPORT_TEMPLATE_HEADERS, [], filename, sheet_name='Template_Parc')
+    return export_to_csv(PARC_IMPORT_TEMPLATE_HEADERS, [], filename)
+
+
 @parc_bp.route('/import', methods=['POST'])
 @check_permission('import')
 def import_parc():
@@ -227,35 +269,52 @@ def import_parc():
             df = pd.read_csv(file)
         else:
             return jsonify({'error': 'File format not supported'}), 400
+
+        missing_headers = _validate_template_headers(df.columns, PARC_IMPORT_TEMPLATE_HEADERS)
+        if missing_headers:
+            return jsonify({
+                'error': 'Template invalide. Utilisez le template officiel.',
+                'missing_headers': missing_headers,
+                'expected_headers': PARC_IMPORT_TEMPLATE_HEADERS,
+            }), 400
         
         imported_count = 0
         errors = []
         
         for index, row in df.iterrows():
             try:
-                serial_number = _first_value(row, ['N° de série', 'N° Série', 'Numero de série', 'Numero serie', 'Serial Number'])
+                serial_number = _first_value(row, ['N° de Série', 'N° Série', 'N° de série', 'Numero du serie'])
                 existing = Parc.query.filter_by(numero_serie=serial_number).first() if serial_number else None
 
                 payload = {
-                    'name': _first_value(row, ['Name', 'Nom', 'nom']),
-                    'alternate_username': _first_value(row, ['Alternate username', 'User', 'Utilisateur']),
-                    'os_name': _first_value(row, ['Operating System - Name', 'OS Name']),
-                    'os_version': _first_value(row, ['Operating System - Version', 'OS Version']),
-                    'type': _first_value(row, ['Type', 'Équipement', 'equipement']),
-                    'model': _first_value(row, ['Model', 'Modèle', 'modele']),
-                    'version': _first_value(row, ['Version', 'version']),
-                    'manufacturer': _first_value(row, ['Manufacturer', 'Constructeur']),
+                    'name': _first_value(row, ['Name']),
+                    'alternate_username': _first_value(row, ['Alternate username']),
+                    'os_name': _first_value(row, ['Operating System - Name']),
+                    'os_version': _first_value(row, ['Operating System - Version']),
+                    'type': _first_value(row, ['Type']),
+                    'model': _first_value(row, ['Model']),
+                    'version': None,
+                    'manufacturer': _first_value(row, ['Manufacturer']),
                     'numero_serie': serial_number,
-                    'processeur': _first_value(row, ['Processeur', 'CPU']),
-                    'ram': _first_value(row, ['RAM', 'Mémoire', 'Memoire']),
-                    'disque_dur': _first_value(row, ['Disque dur', 'Stockage']),
-                    'emplacement': _first_value(row, ['Emplacement', 'Location']),
-                    'service': _first_value(row, ['Service', 'Département', 'Departement']),
-                    'esu': _first_value(row, ['ESU']),
+                    'processeur': _first_value(row, ['Processeur']),
+                    'ram': _first_value(row, ['RAM']),
+                    'disque_dur': _first_value(row, ['Disque Dur']),
+                    'emplacement': _first_value(row, ['Emplacement']),
+                    'service': _first_value(row, ['Service']),
+                    'activite': _first_value(row, ['Activité']),
                 }
+                
+                quantite_val = _first_value(row, ['Quantité', 'Quantite'])
+                try:
+                    payload['quantite'] = int(float(quantite_val)) if quantite_val else 0
+                except:
+                    payload['quantite'] = 0
 
                 if not payload['name']:
                     errors.append(f'Row {index + 1}: Name is required')
+                    continue
+                if not payload['type']:
+                    errors.append(f'Row {index + 1}: Type is required')
                     continue
                 
                 if existing:
@@ -313,15 +372,15 @@ def export_parc():
             item.os_version,
             item.type,
             item.model,
-            item.version,
             item.manufacturer,
-            item.numero_serie,
             item.processeur,
+            item.numero_serie,
             item.ram,
             item.disque_dur,
             item.emplacement,
+            item.activite,
             item.service,
-            item.esu,
+            item.quantite,
         ]
         for item in items
     ]
@@ -352,7 +411,7 @@ def get_parc_stats():
         for label in activite_labels
     }
     activite_rows = db.session.query(
-        Parc.esu,
+        Parc.activite,
         db.func.sum(
             db.case((Parc.type.ilike('%pc portable%'), 1), else_=0)
         ).label('pc_portable'),
@@ -362,7 +421,7 @@ def get_parc_stats():
         db.func.sum(
             db.case((Parc.type.ilike('%ipo%'), 1), else_=0)
         ).label('ipo')
-    ).filter(Parc.esu.in_(activite_labels)).group_by(Parc.esu).all()
+    ).filter(Parc.activite.in_(activite_labels)).group_by(Parc.activite).all()
 
     for row in activite_rows:
         if row[0] in activite_map:
@@ -402,7 +461,8 @@ def parc_to_dict(item):
         'disque_dur': item.disque_dur,
         'emplacement': item.emplacement,
         'service': item.service,
-        'esu': item.esu,
+        'activite': item.activite,
+        'quantite': item.quantite,
         'date_creation': item.date_creation.isoformat(),
         'date_modification': item.date_modification.isoformat()
     }

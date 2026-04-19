@@ -6,11 +6,6 @@ from datetime import datetime
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
-DEFAULT_ADMIN_CREDENTIALS = {
-    'anass': 'Anass@2026',
-    'admin': 'Admin@2026',
-}
-
 
 def _get_current_user_id():
     try:
@@ -28,59 +23,12 @@ def login():
     if not nom or not password:
         return jsonify({'message': 'Nom d\'utilisateur et mot de passe requis'}), 400
 
-    # Ensure demo admin accounts are always accessible with their default passwords
-    normalized_nom = nom.lower()
-    default_password = DEFAULT_ADMIN_CREDENTIALS.get(normalized_nom)
-    if default_password and password == default_password:
-        user = Utilisateur.query.filter_by(nom=normalized_nom).first()
-        if not user:
-            user = Utilisateur(
-                nom=normalized_nom,
-                email=f'{normalized_nom}@hutchinson.fr',
-                password=generate_password_hash(default_password),
-                role='admin',
-                permission_export=True,
-                permission_import=True,
-                date_creation=datetime.utcnow()
-            )
-            db.session.add(user)
-        else:
-            # Keep these accounts in admin mode and repair password hash if needed.
-            user.role = 'admin'
-            user.permission_export = True
-            user.permission_import = True
-            if not check_password_hash(user.password, password):
-                user.password = generate_password_hash(password)
-
-        db.session.commit()
-        access_token = create_access_token(identity=str(user.id))
-        return jsonify({
-            'token': access_token,
-            'user': {
-                'id': user.id,
-                'nom': user.nom,
-                'email': user.email,
-                'role': user.role,
-                'permission_export': user.permission_export,
-                'permission_import': user.permission_import
-            }
-        }), 200
-
-    # Tous les autres utilisateurs peuvent se connecter en mode lecture seule
+    # Require existing users only
     user = Utilisateur.query.filter_by(nom=nom).first()
     if not user:
-        user = Utilisateur(
-            nom=nom,
-            email=f'{nom}@guest.local',
-            password=generate_password_hash(password),
-            role='view_only',
-            permission_export=False,
-            permission_import=False,
-            date_creation=datetime.utcnow()
-        )
-        db.session.add(user)
-        db.session.commit()
-    elif not check_password_hash(user.password, password):
+        return jsonify({'message': 'Utilisateur non trouvé'}), 404
+
+    if not check_password_hash(user.password, password):
         return jsonify({'message': 'Mot de passe incorrect'}), 401
 
     access_token = create_access_token(identity=str(user.id))
@@ -95,6 +43,42 @@ def login():
             'permission_import': user.permission_import
         }
     }), 200
+
+
+@auth_bp.route('/change-password', methods=['PUT'])
+@jwt_required()
+def change_password():
+    current_user_id = _get_current_user_id()
+    if current_user_id is None:
+        return jsonify({'message': 'Token invalide'}), 401
+
+    user = Utilisateur.query.get(current_user_id)
+    if not user:
+        return jsonify({'message': 'Utilisateur non trouvé'}), 404
+
+    data = request.json or {}
+    current_password = (data.get('current_password') or '').strip()
+    new_password = (data.get('new_password') or '').strip()
+
+    if not current_password or not new_password:
+        return jsonify({'message': 'Mot de passe actuel et nouveau mot de passe requis'}), 400
+
+    if len(new_password) < 8:
+        return jsonify({'message': 'Le nouveau mot de passe doit contenir au moins 8 caractères'}), 400
+
+    if not check_password_hash(user.password, current_password):
+        return jsonify({'message': 'Mot de passe actuel incorrect'}), 401
+
+    if check_password_hash(user.password, new_password):
+        return jsonify({'message': 'Le nouveau mot de passe doit être différent de l\'ancien'}), 400
+
+    try:
+        user.password = generate_password_hash(new_password)
+        db.session.commit()
+        return jsonify({'message': 'Mot de passe modifié avec succès'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
 
 # Register endpoint (only accessible by admin)
 @auth_bp.route('/register', methods=['POST'])

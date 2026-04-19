@@ -35,6 +35,8 @@ export const stockAPI = {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   },
+  importTemplate: (format = 'xlsx') =>
+    api.get('/stock/import-template', { params: { format }, responseType: 'blob' }),
   export: (format = 'csv', type_stock = null) => 
     api.get('/stock/export', { params: { format, type_stock }, responseType: 'blob' }),
 };
@@ -43,6 +45,8 @@ export const stockAPI = {
 export const mouvementsAPI = {
   getAll: (page = 1, per_page = 10, type_mouvement = null, search = '') =>
     api.get('/mouvements/', { params: { page, per_page, type_mouvement, search } }),
+  getDechets: (page = 1, per_page = 10, search = '') =>
+    api.get('/mouvements/dechets', { params: { page, per_page, search } }),
   getStockSources: (type_equipement, search = '') =>
     api.get('/mouvements/sources/stock', { params: { type_equipement, search } }),
   getParcSources: (type_equipement, search = '') =>
@@ -51,6 +55,7 @@ export const mouvementsAPI = {
   restoreHistorique: (id) => api.put(`/mouvements/historique/${id}/restore`),
   deleteHistorique: (id) => api.delete(`/mouvements/historique/${id}`),
   getById: (id) => api.get(`/mouvements/${id}`),
+  update: (id, data) => api.put(`/mouvements/${id}`, data),
   create: (data) => api.post('/mouvements/', data),
   delete: (id) => api.delete(`/mouvements/${id}`),
   getStats: () => api.get('/mouvements/stats'),
@@ -74,6 +79,8 @@ export const parcAPI = {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   },
+  importTemplate: (format = 'xlsx') =>
+    api.get('/parc/import-template', { params: { format }, responseType: 'blob' }),
   export: (format = 'csv') =>
     api.get('/parc/export', { params: { format }, responseType: 'blob' }),
 };
@@ -103,6 +110,15 @@ export const locauxITAPI = {
   createMateriel: (data) => api.post('/locaux-it/materiels', data),
   transferMateriel: (id, data) => api.put(`/locaux-it/materiels/${id}/transfer`, data),
   deleteMateriel: (id) => api.delete(`/locaux-it/materiels/${id}`),
+  importMateriel: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/locaux-it/materiels/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  importMaterielTemplate: (format = 'xlsx') =>
+    api.get('/locaux-it/materiels/import-template', { params: { format }, responseType: 'blob' }),
 };
 
 // Utilisateurs API
@@ -119,6 +135,8 @@ export const authAPI = {
   login: (nom, password) => api.post('/auth/login', { nom, password }),
   register: (data) => api.post('/auth/register', data),
   getCurrentUser: () => api.get('/auth/me'),
+  changePassword: (current_password, new_password) =>
+    api.put('/auth/change-password', { current_password, new_password }),
 };
 
 export default api;

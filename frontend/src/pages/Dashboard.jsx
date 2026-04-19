@@ -5,6 +5,12 @@ import { useAuth } from '../context/AuthContext';
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const hiddenAxisLabels = new Set(['OILJK', 'POMLI7']);
+  const allowedStockTypes = ['IMS', 'FSS', 'C2S', 'COMMUN'];
+  const formatAxisLabel = (value) => {
+    const normalized = String(value || '').trim().toUpperCase();
+    return hiddenAxisLabels.has(normalized) ? '' : value;
+  };
   const [stats, setStats] = useState({
     stock: [],
     stockByEquipment: [],
@@ -24,12 +30,19 @@ export default function Dashboard() {
       total: 0
     }
   });
-  const parcFocusedChartData = [
-    { type: 'pc portable', count: stats.parc.pc_portable || 0 },
-    { type: 'pc fixe', count: stats.parc.pc_fixe || 0 },
-    { type: 'ipo', count: stats.parc.ipo || 0 },
-  ];
   const [loading, setLoading] = useState(true);
+
+  const filteredStockByEquipment = stats.stockByEquipment
+    .filter((item) => allowedStockTypes.includes(String(item.type_stock || '').trim().toUpperCase()))
+    .sort((a, b) => {
+      const aIndex = allowedStockTypes.indexOf(String(a.type_stock || '').trim().toUpperCase());
+      const bIndex = allowedStockTypes.indexOf(String(b.type_stock || '').trim().toUpperCase());
+      return aIndex - bIndex;
+    });
+
+  const mouvementsEntree = stats.mouvements.find((m) => m.type_mouvement === 'entrée')?.total_quantite || 0;
+  const mouvementsSortie = stats.mouvements.find((m) => m.type_mouvement === 'sortie')?.total_quantite || 0;
+  const mouvementsTotal = Number(mouvementsEntree) + Number(mouvementsSortie);
 
   useEffect(() => {
     loadDashboard();
@@ -66,6 +79,16 @@ export default function Dashboard() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="rounded-[28px] bg-white p-8 shadow-sm border border-slate-200 text-slate-600">
+          Chargement du dashboard...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
@@ -89,7 +112,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-
       <div className="bg-gradient-to-r from-slate-50 to-blue-50 p-4 rounded-[20px] shadow border border-slate-200">
         <h3 className="text-lg font-semibold text-slate-900 mb-3">Stock</h3>
         <div className="grid gap-4 lg:grid-cols-3">
@@ -108,18 +130,18 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {stats.stockByEquipment.length > 0 && (
+      {filteredStockByEquipment.length > 0 && (
         <div className="bg-white p-6 rounded-[28px] shadow-md border border-slate-200">
           <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="text-xl font-bold text-slate-900">Répartition par Type de Stock</h3>
-              <p className="text-sm text-slate-500">Pour chaque stock, affichage séparé des PC portables, PC fixes et IPO</p>
+              <p className="text-sm text-slate-500">Affichage limité à IMS, FSS, C2S et Commun</p>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={stats.stockByEquipment} barGap={10}>
+            <BarChart data={filteredStockByEquipment} barGap={10}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="type_stock" />
+              <XAxis dataKey="type_stock" tickFormatter={formatAxisLabel} />
               <YAxis />
               <Tooltip />
               <Legend />
@@ -143,7 +165,7 @@ export default function Dashboard() {
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={stats.parcByActivite} barGap={10}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="activite" />
+              <XAxis dataKey="activite" tickFormatter={formatAxisLabel} />
               <YAxis allowDecimals={false} />
               <Tooltip />
               <Legend />
@@ -165,6 +187,7 @@ export default function Dashboard() {
           <p>✓ Import/Export de données Excel</p>
         </div>
       </div>
+
     </div>
   );
 }

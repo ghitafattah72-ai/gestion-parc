@@ -31,15 +31,21 @@ class Stock(db.Model):
     date_creation = db.Column(db.DateTime, default=datetime.utcnow)
     date_modification = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    # Détails pour PC/Portables
+    # Détails équipement
     ram = db.Column(db.String(50))
-    stockage = db.Column(db.String(50))
+    stockage = db.Column(db.String(100))
     processeur = db.Column(db.String(100))
     numero_serie = db.Column(db.String(100))
     activite = db.Column(db.String(100))
     systeme = db.Column(db.String(100))
     accessoires = db.Column(db.Text)
-    
+    alternate_username = db.Column(db.String(255))
+    os_version = db.Column(db.String(100))
+    manufacturer = db.Column(db.String(100))
+    disque_dur = db.Column(db.String(100))
+    emplacement = db.Column(db.String(100))
+    service = db.Column(db.String(100))
+
     def __repr__(self):
         return f'<Stock {self.nom_equipement}>'
 
@@ -114,7 +120,8 @@ class Parc(db.Model):
     disque_dur = db.Column(db.String(50))
     emplacement = db.Column(db.String(100))
     service = db.Column(db.String(100))
-    esu = db.Column(db.String(50))
+    activite = db.Column(db.String(50))
+    quantite = db.Column(db.Integer, default=0)
     date_creation = db.Column(db.DateTime, default=datetime.utcnow)
     date_modification = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -175,13 +182,28 @@ class MaterielIT(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     type_materiel = db.Column(db.String(100), nullable=False)
+    uc = db.Column(db.String(100))
     nom = db.Column(db.String(255), nullable=False)
+    marque = db.Column(db.String(255))
     modele = db.Column(db.String(255))
     version = db.Column(db.String(100))
     os_firmware = db.Column(db.String(255))
     numero_serie = db.Column(db.String(100))
+    processeur = db.Column(db.String(255))
+    ram = db.Column(db.String(100))
+    stockage = db.Column(db.String(100))
     stack_role = db.Column(db.String(100))
     stack_ip = db.Column(db.String(100))
+    mac_wifi = db.Column(db.String(100))
+    user_assigned = db.Column(db.String(255))
+    id_user = db.Column(db.String(100))
+    etat_materiel = db.Column(db.String(100))
+    date_affectation = db.Column(db.DateTime)
+    baie_port = db.Column(db.String(100))
+    mac_address = db.Column(db.String(100))
+    douchette = db.Column(db.String(100))
+    lecteur_badge = db.Column(db.String(100))
+    autre_materiel = db.Column(db.Text)
     description = db.Column(db.Text)
 
     # Linked to either a baie OR directly a local

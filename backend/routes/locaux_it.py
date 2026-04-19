@@ -3,6 +3,7 @@ from models import db, LocalIT, BaieIT, MaterielIT
 from datetime import datetime
 from decorators import check_permission
 from export_utils import export_to_csv, export_to_excel, export_to_excel_sheets, get_export_filename
+import pandas as pd
 
 locaux_it_bp = Blueprint('locaux_it', __name__, url_prefix='/api/locaux-it')
 
@@ -140,7 +141,7 @@ def init_default_baies():
         db.session.rollback()
         return jsonify({'error': str(e)}), 400
 
-# ========== BAIES IT ROUTES ==========
+# ========== ROUTES BAIES IT  ==========
 
 # GET all baies for a local IT
 @locaux_it_bp.route('/<int:local_id>/baies', methods=['GET'])
@@ -262,13 +263,28 @@ def materiel_to_dict(item):
     return {
         'id': item.id,
         'type_materiel': item.type_materiel,
+        'uc': item.uc,
         'nom': item.nom,
+        'marque': item.marque,
         'modele': item.modele,
         'version': item.version,
         'os_firmware': item.os_firmware,
         'numero_serie': item.numero_serie,
+        'processeur': item.processeur,
+        'ram': item.ram,
+        'stockage': item.stockage,
         'stack_role': item.stack_role,
         'stack_ip': item.stack_ip,
+        'mac_wifi': item.mac_wifi,
+        'user_assigned': item.user_assigned,
+        'id_user': item.id_user,
+        'etat_materiel': item.etat_materiel,
+        'date_affectation': item.date_affectation.isoformat() if item.date_affectation else None,
+        'baie_port': item.baie_port,
+        'mac_address': item.mac_address,
+        'douchette': item.douchette,
+        'lecteur_badge': item.lecteur_badge,
+        'autre_materiel': item.autre_materiel,
         'description': item.description,
         'baie_id': item.baie_id,
         'local_it_id': item.local_it_id,
@@ -277,7 +293,7 @@ def materiel_to_dict(item):
     }
 
 
-# ========== MATERIEL IT ROUTES ==========
+# ========== ROUTES MATERIEL IT  ==========
 
 @locaux_it_bp.route('/materiels', methods=['POST'])
 def create_materiel():
@@ -328,7 +344,7 @@ def transfer_materiel(id):
         if target_baie_id:
             target_baie = BaieIT.query.get(target_baie_id)
             if not target_baie:
-                return jsonify({'error': 'Baie destination introuvable'}), 404
+                return jsonify({'error': 'Baie  introuvable'}), 404
             if item.baie_id == target_baie.id:
                 return jsonify({'error': 'Ce matériel est déjà dans cette baie'}), 400
 
@@ -337,14 +353,14 @@ def transfer_materiel(id):
         elif target_local_id:
             target_local = LocalIT.query.get(target_local_id)
             if not target_local:
-                return jsonify({'error': 'Local destination introuvable'}), 404
+                return jsonify({'error': 'Local  introuvable'}), 404
             if item.baie_id is None and item.local_it_id == target_local.id:
                 return jsonify({'error': 'Ce matériel est déjà dans ce local'}), 400
 
             item.local_it_id = target_local.id
             item.baie_id = None
         else:
-            return jsonify({'error': 'Choisissez un local ou une baie de destination'}), 400
+            return jsonify({'error': 'Choisissez un local ou une baie '}), 400
 
         item.date_modification = datetime.utcnow()
         db.session.commit()
@@ -354,14 +370,152 @@ def transfer_materiel(id):
         return jsonify({'error': str(e)}), 400
 
 
-# ========== EXPORT ROUTES ==========
+# ========== ROUTES IMPORT/EXPORT MATERIELS IT  ==========
+
+MATERIEL_IT_TEMPLATE_HEADERS = [
+    'UC',
+    'Nomination',
+    'Marque',
+    'Systèmes d\'exploitation',
+    'Version',
+    'Modèle',
+    'Processeur',
+    'RAM',
+    'Stockage',
+    'Adresse IP',
+    'Adresse MAC Wi-Fi',
+    'Utilisateur Assigné',
+    'ID_User',
+    'État du Matériel',
+    'Date d\'affectation',
+    'Commentaire',
+    'BAIE\\PORT',
+    'Adresse MAC',
+    'Douchette',
+    'Lecteur de Badge',
+    'Autre matériel',
+]
+
+@locaux_it_bp.route('/materiels/import-template', methods=['GET'])
+@check_permission('import')
+def export_materiel_import_template():
+    format_type = (request.args.get('format', 'xlsx') or 'xlsx').lower()
+    if format_type not in ['csv', 'xlsx']:
+        return jsonify({'error': 'Invalid format. Use csv or xlsx'}), 400
+
+    filename = get_export_filename('materiel_it_import_template', format_type)
+    if format_type == 'xlsx':
+        return export_to_excel(MATERIEL_IT_TEMPLATE_HEADERS, [], filename, sheet_name='Template_Materiel')
+    return export_to_csv(MATERIEL_IT_TEMPLATE_HEADERS, [], filename)
+
+
+@locaux_it_bp.route('/materiels/import', methods=['POST'])
+@check_permission('import')
+def import_materiel_it():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        import pandas as pd
+        filename = (file.filename or '').lower()
+        if filename.endswith('.xlsx') or filename.endswith('.xls'):
+            df = pd.read_excel(file)
+        elif filename.endswith('.csv'):
+            df = pd.read_csv(file)
+        else:
+            return jsonify({'error': 'File format not supported'}), 400
+
+        imported_count = 0
+        errors = []
+
+        for index, row in df.iterrows():
+            try:
+                nom = (row.get('Nomination') or '').strip()
+                type_materiel = (row.get('Marque') or 'autre').strip()
+                
+                if not nom:
+                    errors.append(f'Row {index + 1}: Nomination is required')
+                    continue
+
+                uc = (row.get('UC') or '').strip() or None
+                marque = (row.get('Marque') or '').strip() or None
+                systeme = (row.get('Systèmes d\'exploitation') or '').strip() or None
+                version = (row.get('Version') or '').strip() or None
+                modele = (row.get('Modèle') or '').strip() or None
+                processeur = (row.get('Processeur') or '').strip() or None
+                ram = (row.get('RAM') or '').strip() or None
+                stockage = (row.get('Stockage') or '').strip() or None
+                ip = (row.get('Adresse IP') or '').strip() or None
+                mac_wifi = (row.get('Adresse MAC Wi-Fi') or '').strip() or None
+                user_assigned = (row.get('Utilisateur Assigné') or '').strip() or None
+                id_user = (row.get('ID_User') or '').strip() or None
+                etat = (row.get('État du Matériel') or '').strip() or None
+                date_aff_str = row.get('Date d\'affectation')
+                date_aff = None
+                if date_aff_str:
+                    try:
+                        date_aff = pd.to_datetime(date_aff_str).to_pydatetime()
+                    except:
+                        pass
+                commentaire = (row.get('Commentaire') or '').strip() or None
+                baie_port = (row.get('BAIE\\PORT') or '').strip() or None
+                mac_addr = (row.get('Adresse MAC') or '').strip() or None
+                douchette = (row.get('Douchette') or '').strip() or None
+                lecteur = (row.get('Lecteur de Badge') or '').strip() or None
+                autre = (row.get('Autre matériel') or '').strip() or None
+
+                new_materiel = MaterielIT(
+                    uc=uc,
+                    nom=nom,
+                    marque=marque,
+                    type_materiel=type_materiel,
+                    os_firmware=systeme,
+                    version=version,
+                    modele=modele,
+                    processeur=processeur,
+                    ram=ram,
+                    stockage=stockage,
+                    stack_ip=ip,
+                    mac_wifi=mac_wifi,
+                    user_assigned=user_assigned,
+                    id_user=id_user,
+                    etat_materiel=etat,
+                    date_affectation=date_aff,
+                    description=commentaire,
+                    baie_port=baie_port,
+                    mac_address=mac_addr,
+                    douchette=douchette,
+                    lecteur_badge=lecteur,
+                    autre_materiel=autre,
+                )
+                db.session.add(new_materiel)
+                imported_count += 1
+            except Exception as e:
+                errors.append(f'Row {index + 1}: {str(e)}')
+
+        db.session.commit()
+        return jsonify({
+            'message': f'{imported_count} matériels imported successfully',
+            'imported_count': imported_count,
+            'errors': errors
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
+
+# ========== ROUTES EXPORT  ==========
 
 @locaux_it_bp.route('/export', methods=['GET'])
 @check_permission('export')
 def export_locaux_it():
     format_type = (request.args.get('format', 'csv') or 'csv').lower()
     if format_type not in ['csv', 'xlsx']:
-        return jsonify({'error': 'Invalid format. Use csv or xlsx'}), 400
+        return jsonify({'error': 'Invalid format '}), 400
 
     items = LocalIT.query.order_by(LocalIT.nom.asc()).all()
 
