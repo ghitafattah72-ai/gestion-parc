@@ -31,8 +31,8 @@ export default function Dechet() {
   return (
     <div className="space-y-6">
       <div className="rounded-[28px] bg-gradient-to-r from-slate-900 to-slate-700 p-6 text-white shadow-lg">
-        <h2 className="text-3xl font-bold">Dechet</h2>
-        <p className="mt-2 text-slate-200">Historique des sorties vers dechet depuis le stock.</p>
+        <h2 className="text-3xl font-bold">Déchets</h2>
+        <p className="mt-2 text-slate-200">Historique des sorties vers déchets depuis le stock.</p>
       </div>
 
       <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
@@ -46,7 +46,7 @@ export default function Dechet() {
               setPage(1);
             }}
             className="flex-1 bg-transparent p-2 text-slate-700 outline-none"
-            placeholder="Rechercher dans les dechets..."
+            placeholder="Rechercher dans les déchets..."
           />
         </div>
       </div>

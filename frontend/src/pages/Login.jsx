@@ -63,15 +63,24 @@ function Login({ onLoginSuccess }) {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5" autoComplete="off">
+            <input type="text" name="fake_username" autoComplete="username" className="hidden" tabIndex={-1} />
+            <input type="password" name="fake_password" autoComplete="current-password" className="hidden" tabIndex={-1} />
             <div>
               <label className="mb-2 block text-sm font-semibold text-slate-700">Nom d'utilisateur</label>
               <div className="relative">
                 <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
+                  name="login_user_manual"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  readOnly
+                  onFocus={(e) => e.target.removeAttribute('readonly')}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-11 pr-4 text-slate-900 outline-none transition focus:border-slate-500 focus:bg-white focus:ring-4 focus:ring-slate-100"
                   placeholder="Entrez votre utilisateur"
                   disabled={loading}
@@ -85,8 +94,12 @@ function Login({ onLoginSuccess }) {
                 <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type={showPassword ? 'text' : 'password'}
+                  name="login_password_manual"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="new-password"
+                  readOnly
+                  onFocus={(e) => e.target.removeAttribute('readonly')}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-11 pr-12 text-slate-900 outline-none transition focus:border-slate-500 focus:bg-white focus:ring-4 focus:ring-slate-100"
                   placeholder="Entrez votre mot de passe"
                   disabled={loading}

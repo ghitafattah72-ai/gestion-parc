@@ -1,13 +1,13 @@
-# Gestion du Parc Informatique Hutchinson
-
-Application complète de gestion du parc informatique avec gestion de stock et des locaux IT.
+Application web de gestion du parc informatique, du stock, des mouvements, des dechets et des locaux IT.
 
 ## Architecture
 
 ### Backend
 - **Framework**: Flask (Python)
-- **Base de données**: MySQL
+- **Base de donnees**: SQLite par defaut, MySQL en option
 - **API**: RESTful avec Flask-CORS
+- **Authentification**: JWT avec Flask-JWT-Extended
+- **ORM**: SQLAlchemy
 
 ### Frontend
 - **Framework**: React 18
@@ -15,134 +15,179 @@ Application complète de gestion du parc informatique avec gestion de stock et d
 - **HTTP Client**: Axios
 - **Routing**: React Router v6
 - **Icons**: Lucide React
+- **Charts**: Recharts
 
-##  Structure du Projet
+## Langages de Programmation
 
-```
+- **Python**: logique backend, API Flask, securite JWT et acces base de donnees
+- **JavaScript**: frontend React, appels API Axios, routage et interactions UI
+- **SQL**: modelisation et manipulation des donnees (SQLite par defaut, MySQL en option)
+- **HTML/CSS**: structure et presentation de l'interface utilisateur (avec Tailwind CSS)
+
+## Structure du Projet
+
+```text
 gs parc/
-├── backend/                 # API Flask
-│   ├── routes/             # Routes API pour chaque module
-│   ├── app.py              # Main application
-│   ├── config.py           # Configuration
-│   ├── models.py           # Modèles SQLAlchemy
-│   └── requirements.txt     # Dépendances Python
+├── backend/                    # API Flask
+│   ├── routes/                 # Routes API par module
+│   ├── utils/                  # Helpers backend
+│   ├── uploads/                # Fichiers importes/exportes
+│   ├── app.py                  # Point d'entree de l'application
+│   ├── config.py               # Configuration base de donnees / environnement
+│   ├── decorators.py           # Permissions et protection JWT
+│   ├── export_utils.py         # Export CSV / Excel
+│   ├── models.py               # Modeles SQLAlchemy
+│   ├── requirements.txt        # Dependances Python
+│   └── gestion_parc.db         # Base SQLite locale
 │
-├── frontend/               # Application React
+├── frontend/                   # Application React
 │   ├── src/
-│   │   ├── pages/          # Pages principales
-│   │   ├── components/     # Composants réutilisables
-│   │   ├── api.js          # Client API
-│   │   └── App.jsx         # Composant principal
-│   ├── tailwind.config.js  # Configuration Tailwind
-│   └── package.json        # Dépendances Node
+│   │   ├── components/         # Composants reutilisables
+│   │   ├── context/            # Gestion d'authentification
+│   │   ├── pages/              # Pages principales
+│   │   ├── utils/              # Helpers frontend
+│   │   ├── api.js              # Client API Axios
+│   │   └── App.jsx             # Shell principal + navigation
+│   ├── public/
+│   ├── tailwind.config.js
+│   └── package.json
 │
-└── database/               # Scripts SQL
-    └── schema.sql          # Schéma de base de données
+└── database/                   # Script SQL optionnel pour MySQL
+    └── schema.sql
 ```
 
-##  Installation et Démarrage
+## Installation et Demarrage
 
-### 1. Configuration de la Base de Données
-
-```bash
-# Créer la base de données
-mysql -u root -p < database/schema.sql
-```
-
-### 2. Backend (Python/Flask)
+### 1. Backend (Python/Flask)
 
 ```bash
 cd backend
 
-# Créer un environnement virtuel
+# Creer un environnement virtuel
 python -m venv venv
 
 # Activer l'environnement
 # Windows
-venv\\Scripts\\activate
+venv\Scripts\activate
 
-# Installer les dépendances
+# Installer les dependances
 pip install -r requirements.txt
 
-# Créer le fichier .env
+# Creer le fichier .env si necessaire
 copy .env.example .env
-# Éditer .env avec vos infos MySQL
 
-# Démarrer le serveur
+# Demarrer le serveur
 python app.py
 ```
 
-Le serveur Flask démarre sur `http://localhost:5000`
+Le serveur Flask demarre sur `http://localhost:5000`.
 
-### 3. Frontend (React)
+### 2. Frontend (React)
 
 ```bash
 cd frontend
 
-# Installer les dépendances
+# Installer les dependances
 npm install
 
-# Démarrer le serveur de développement
+# Demarrer le serveur de developpement
 npm start
 ```
 
-L'application React démarre sur `http://localhost:3000`
+L'application React demarre sur `http://localhost:3000`.
 
-##  Fonctionnalités Implémentées
+### 3. Base de donnees
+
+#### Mode par defaut: SQLite
+Aucune installation supplementaire n'est necessaire. Le fichier `backend/gestion_parc.db` est utilise automatiquement.
+
+#### Mode optionnel: MySQL
+Si vous souhaitez utiliser MySQL, ajoutez `DB_TYPE=mysql` dans le fichier `.env` puis configurez les variables suivantes:
+
+```env
+DB_TYPE=mysql
+MYSQL_HOST=localhost
+MYSQL_USER=root
+MYSQL_PASSWORD=
+MYSQL_DB=gestion_parc
+MYSQL_PORT=3306
+```
+
+Vous pouvez ensuite initialiser la base avec:
+
+```bash
+mysql -u root -p < database/schema.sql
+```
+
+## Fonctionnalites Implementees
 
 ### 1. Gestion du Stock
-- ✅ Affichage des matériels et quantités
-- ✅ Ajout d'équipements
-- ✅ Suppression d'équipements
-- ✅ Recherche et filtrage par type de stock
-- ✅ **Export en CSV/Excel**
-- ✅ Détails PC (RAM, Stockage, Processeur, etc.)
-- ✅ États des équipements (nouveau, occasion bon état, occasion mauvaise état, en panne)
+- Affichage des materiels et quantites
+- Ajout, modification et suppression d'equipements
+- Recherche et filtrage par type de stock
+- Export en CSV / Excel
+- Gestion des details techniques des PC
+- Gestion de l'etat des equipements
 
 ### 2. Gestion des Mouvements
-- ✅ Transfert d'équipements du stock vers Local IT
-- ✅ Mise à jour automatique des quantités en stock
-- ✅ Suivi des sorties de stock
-- ✅ Détails des PC et accessoires
-- ✅ **Export en CSV/Excel**
-- ✅ Suppression de mouvements avec restauration du stock
+- Entrees et sorties de stock
+- Sortie du stock vers le parc
+- Sortie du stock vers dechet
+- Mise a jour automatique des quantites
+- Historique et restauration de mouvements supprimes
+- Export en CSV / Excel
+- Description libre pour chaque mouvement
 
 ### 3. Gestion du Parc
-- ✅ Ajout et modification d'équipements parc
-- ✅ Tableau avec colonnes: Name, Alternate username, OS Name, OS Version, Type, Model, Manufacturer, N° de série, Processeur, RAM, Disque dur, Emplacement, Service, ESU
-- ✅ **Import depuis Excel/CSV**
-- ✅ **Export en CSV/Excel**
-- ✅ Recherche par nom ou N° de série
+- Ajout et modification d'equipements du parc
+- Colonnes detaillees: Name, Alternate username, OS Name, OS Version, Type, Model, Version, Manufacturer, Numero de serie, Processeur, RAM, Disque dur, Emplacement, Service, Activite
+- Import depuis Excel / CSV
+- Export en CSV / Excel
+- Recherche par nom, modele ou numero de serie
 
-### 4. Gestion des Locaux IT
-- ✅ 5 locaux IT pré-configurés (CIM2, CIM6, CIM7, CIM4H1, CIM4H2)
-- ✅ Ajout et modification de locaux IT
-- ✅ Gestion dynamique des baies IT
-- ✅ Bouton pour ajouter du matériel à chaque local
-- ✅ Transfert automatique vers les baies
+### 4. Gestion des Dechets
+- Page dediee pour consulter les sorties vers dechet
+- Recherche et pagination
+- Tracabilite des equipements sortis du stock vers dechet
 
-### 5. Tableau de Bord
-- ✅ Statistiques globales
-- ✅ Graphiques de quantités par type de stock
-- ✅ Mise à jour automatique
+### 5. Gestion des Locaux IT
+- Locaux IT preconfigures
+- Ajout et modification de locaux IT
+- Gestion dynamique des baies IT
+- Gestion du materiel IT reseau
+- Export des locaux et des baies
 
-##  Sécurité
+### 6. Tableau de Bord
+- Statistiques globales
+- Graphiques de quantites par type de stock
+- Vue synthetique du parc et du stock
+- Mise a jour automatique
 
-- Permissions utilisateur pour export/import
-- Rôles (admin, user, manager)
-- Structure de base de données sécurisée avec contraintes
+### 7. Authentification et Comptes
+- Connexion securisee par JWT
+- Compte administrateur par defaut
+- Changement de mot de passe
+- Verification des permissions import / export
 
-##  Types d'Équipements Supportés
+## Securite
+
+- Authentification JWT
+- Endpoint utilisateur courant (`/api/auth/me`)
+- Changement de mot de passe securise
+- Permissions utilisateur pour l'import et l'export
+- Role administrateur pour les operations sensibles
+
+## Types d'Equipements Supportes
 
 - pc portable
 - pc fixe
 - imprimante
-- étiquette
+- etiquette
 - imprimante A4
 - imprimante location
 - imprimante traceur
-- écran
-- câble
+- ecran
+- cable
 - souris filaire
 - clavier filaire
 - souris sans fil
@@ -151,104 +196,129 @@ L'application React démarre sur `http://localhost:3000`
 - casque
 - autre
 
-##  Types de Stock
+## Types de Stock
 
 - FSS
 - IMS
 - C2S
 - Commun
 
-##  Base de Données MySQL
+## Base de Donnees
 
-**Nom de la base**: `gestion_parc`
+### Base par defaut
+- `SQLite` avec le fichier `backend/gestion_parc.db`
 
-**Tables principales**:
+### Base optionnelle
+- `MySQL` si `DB_TYPE=mysql` est configure
+
+### Tables principales
 - `utilisateurs` - Gestion des utilisateurs et permissions
-- `stock` - Inventaire des équipements
-- `mouvements` - Historique des transferts
-- `parc` - Équipements utilisateur
+- `stock` - Inventaire des equipements
+- `mouvements` - Historique des entrees et sorties
+- `mouvements_historique` - Historique des mouvements supprimes
+- `parc` - Equipements du parc utilisateur
 - `locaux_it` - Locaux informatiques
 - `baies_it` - Baies techniques
-- `equipements_baies` - Liaison équipements-baies
+- `equipements_baies` - Liaison equipements / baies
+- `materiel_it` - Materiel IT reseau
 
-##  API Endpoints
+## API Endpoints
+
+### Authentification
+- `POST /api/auth/login` - Connexion utilisateur
+- `GET /api/auth/me` - Recuperer l'utilisateur connecte
+- `PUT /api/auth/change-password` - Modifier le mot de passe
 
 ### Stock
-- `GET /api/stock/` - Lister tous les stocks
-- `POST /api/stock/` - Créer un stock
+- `GET /api/stock/` - Lister les stocks
+- `POST /api/stock/` - Creer un stock
+- `PUT /api/stock/<id>` - Modifier un stock
 - `DELETE /api/stock/<id>` - Supprimer un stock
-- `GET /api/stock/stats` - Statistiques
-- `GET /api/stock/export` - Exporter (format: csv ou xlsx)
+- `GET /api/stock/stats` - Statistiques stock
+- `GET /api/stock/export` - Exporter les donnees
+- `POST /api/stock/import` - Importer un fichier
 
 ### Mouvements
-- `GET /api/mouvements/` - Lister mouvements
-- `POST /api/mouvements/` - Créer mouvement
-- `DELETE /api/mouvements/<id>` - Supprimer mouvement
-- `GET /api/mouvements/stats` - Statistiques
-- `GET /api/mouvements/export` - Exporter
+- `GET /api/mouvements/` - Lister les mouvements
+- `GET /api/mouvements/dechets` - Lister les sorties vers dechet
+- `POST /api/mouvements/` - Creer un mouvement
+- `PUT /api/mouvements/<id>` - Modifier un mouvement
+- `DELETE /api/mouvements/<id>` - Supprimer un mouvement
+- `GET /api/mouvements/stats` - Statistiques mouvements
+- `GET /api/mouvements/export` - Exporter les mouvements
+- `GET /api/mouvements/sources/stock` - Sources disponibles depuis le stock
+- `GET /api/mouvements/sources/parc` - Sources disponibles depuis le parc
 
 ### Parc
-- `GET /api/parc/` - Lister parc
-- `POST /api/parc/` - Créer équipement
-- `PUT /api/parc/<id>` - Modifier équipement
-- `DELETE /api/parc/<id>` - Supprimer équipement
-- `POST /api/parc/import` - Importer Excel
-- `GET /api/parc/export` - Exporter
+- `GET /api/parc/` - Lister le parc
+- `POST /api/parc/` - Creer un equipement
+- `PUT /api/parc/<id>` - Modifier un equipement
+- `DELETE /api/parc/<id>` - Supprimer un equipement
+- `POST /api/parc/import` - Importer un fichier Excel / CSV
+- `GET /api/parc/export` - Exporter le parc
 
 ### Locaux IT
-- `GET /api/locaux-it/` - Lister locaux
-- `POST /api/locaux-it/` - Créer local
-- `PUT /api/locaux-it/<id>` - Modifier local
-- `GET /api/locaux-it/<id>/baies` - Baies d'un local
-- `POST /api/locaux-it/<id>/baies` - Ajouter baie
+- `GET /api/locaux-it/` - Lister les locaux
+- `POST /api/locaux-it/` - Creer un local
+- `PUT /api/locaux-it/<id>` - Modifier un local
+- `GET /api/locaux-it/<id>/baies` - Lister les baies d'un local
+- `POST /api/locaux-it/<id>/baies` - Ajouter une baie
 
-##  Interface Utilisateur
+## Interface Utilisateur
 
-- Navigation latérale intuitive
-- Palette de couleurs professionnelle (bleu Hutchinson)
-- Responsive design
+- Navigation principale: Dashboard, Parc, Stock, Locaux IT, Mouvements, Dechets
+- Interface responsive
 - Formulaires dynamiques
-- Tables avec pagination
+- Tables avec pagination et recherche
+- Tableau de bord avec statistiques et graphiques
 
-##  Fichiers Excel Supportés
+## Fichiers Excel Supportes
 
 - `.xlsx` - Fichiers Excel modernes
 - `.xls` - Fichiers Excel classiques
 - `.csv` - Fichiers CSV
 
-##  Configuration Environnement
+## Configuration Environnement
 
-Fichier `.env.example`:
+Exemple de configuration:
 
-```
-MYSQL_HOST=localhost
-MYSQL_USER=root
-MYSQL_PASSWORD=
-MYSQL_DB=gestion_parc
-MYSQL_PORT=3306
+```env
 FLASK_ENV=development
 FLASK_DEBUG=True
+JWT_SECRET_KEY=change-me-in-production
+
+# Optionnel: activer MySQL
+# DB_TYPE=mysql
+# MYSQL_HOST=localhost
+# MYSQL_USER=root
+# MYSQL_PASSWORD=
+# MYSQL_DB=gestion_parc
+# MYSQL_PORT=3306
 ```
 
-##  Dépannage
+## Depannage
 
-### Erreur de connexion à MySQL
-- Vérifier que MySQL est en cours d'exécution
-- Vérifier les identifiants dans le fichier `.env`
-- S'assurer que la base de données est créée
+### Probleme de base de donnees
+- En SQLite: verifier que le dossier `backend/` est accessible en ecriture
+- En MySQL: verifier que MySQL est demarre et que les identifiants sont corrects
+- Verifier le type de base configure dans `backend/config.py`
 
 ### Erreur CORS
-- La configuration CORS est activée côté backend
-- Vérifier l'URL du backend dans `frontend/src/api.js`
+- La configuration CORS est activee cote backend
+- Verifier l'URL du backend dans `frontend/src/api.js`
 
-### Problème d'import Excel
-- Vérifier le format du fichier
+### Probleme d'import Excel
+- Verifier le format du fichier
 - S'assurer que les colonnes correspondent aux champs attendus
 
-##  Support
+### Probleme d'authentification
+- Verifier la presence du token JWT
+- Se reconnecter si le token a expire
 
-Pour toute question concernant l'application, veuillez contacter l'équipe IT de Hutchinson.
+## Support
+
+Pour toute question concernant l'application, veuillez contacter l'equipe IT de Hutchinson.
 
 ---
 
-**Développé pour Hutchinson** - Gestion du parc informatique centralisée
+**Developpe pour Hutchinson** - Gestion du parc informatique centralisee
