@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Search } from 'lucide-react';
+import { Download, Search } from 'lucide-react';
 import { mouvementsAPI } from '../api';
+import { useAuth } from '../context/AuthContext';
+import { handleExportFile } from '../utils/fileExport';
 
 export default function Dechet() {
+  const { hasPermission } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -28,11 +31,41 @@ export default function Dechet() {
     }
   };
 
+  const handleExport = async (format) => {
+    try {
+      await handleExportFile(
+        (fmt) => mouvementsAPI.exportDechets(fmt),
+        format,
+        'dechets'
+      );
+    } catch (error) {
+      alert(error.message);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="rounded-[28px] bg-gradient-to-r from-slate-900 to-slate-700 p-6 text-white shadow-lg">
         <h2 className="text-3xl font-bold">Déchets</h2>
         <p className="mt-2 text-slate-200">Historique des sorties vers déchets depuis le stock.</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => handleExport('csv')}
+            disabled={!hasPermission('export')}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-400/60 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download size={16} /> CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => handleExport('xlsx')}
+            disabled={!hasPermission('export')}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-400/60 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download size={16} /> Excel
+          </button>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
@@ -60,17 +93,16 @@ export default function Dechet() {
                 <th className="p-3 text-left">Type</th>
                 <th className="p-3 text-left">Model</th>
                 <th className="p-3 text-left">N Serie</th>
-                <th className="p-3 text-left">Qte</th>
                 <th className="p-3 text-left">Type Stock</th>
                 <th className="p-3 text-left">Date</th>
-                <th className="p-3 text-left">Description</th>
+                <th className="p-3 text-left">Motif</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="8" className="p-4 text-center">Chargement...</td></tr>
+                <tr><td colSpan="7" className="p-4 text-center">Chargement...</td></tr>
               ) : items.length === 0 ? (
-                <tr><td colSpan="8" className="p-4 text-center">Aucun mouvement dechet</td></tr>
+                <tr><td colSpan="7" className="p-4 text-center">Aucun mouvement dechet</td></tr>
               ) : (
                 items.map((item) => (
                   <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
@@ -78,7 +110,6 @@ export default function Dechet() {
                     <td className="p-3">{item.type_equipement || '-'}</td>
                     <td className="p-3">{item.model_equipement || '-'}</td>
                     <td className="p-3">{item.numero_serie || '-'}</td>
-                    <td className="p-3">{item.quantite}</td>
                     <td className="p-3">{item.type_stock || '-'}</td>
                     <td className="p-3">{item.date_mouvement ? new Date(item.date_mouvement).toLocaleDateString() : '-'}</td>
                     <td className="p-3">{item.description || '-'}</td>

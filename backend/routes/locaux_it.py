@@ -33,12 +33,12 @@ def create_local_it():
         db.session.commit()
 
         return jsonify({
-            'message': 'Local IT created successfully',
+            'message': 'Local IT ajouté avec succès',
             'local': local_to_dict(new_item)
         }), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de l'ajout du local IT : {str(e)}"}), 400
 
 # PUT update local IT
 @locaux_it_bp.route('/<int:id>', methods=['PUT'])
@@ -54,12 +54,12 @@ def update_local_it(id):
         db.session.commit()
         
         return jsonify({
-            'message': 'Local IT updated successfully',
+            'message': 'Local IT modifié avec succès',
             'local': local_to_dict(item)
         })
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de la modification du local IT : {str(e)}"}), 400
 
 # DELETE local IT
 @locaux_it_bp.route('/<int:id>', methods=['DELETE'])
@@ -69,10 +69,10 @@ def delete_local_it(id):
     try:
         db.session.delete(item)
         db.session.commit()
-        return jsonify({'message': 'Local IT deleted successfully'})
+        return jsonify({'message': 'Local IT supprimé avec succès'})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de la suppression du local IT : {str(e)}"}), 400
 
 # GET default locaux IT
 @locaux_it_bp.route('/default/init', methods=['POST'])
@@ -97,12 +97,12 @@ def init_default_locaux():
         db.session.commit()
         
         return jsonify({
-            'message': f'{created} default locaux IT created',
+            'message': f'{created} local(aux) IT par défaut créé(s)',
             'created': created
         }), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de l'initialisation des locaux IT : {str(e)}"}), 400
 
 # GET init default baies for locaux IT
 @locaux_it_bp.route('/default/init-baies', methods=['POST'])
@@ -134,12 +134,12 @@ def init_default_baies():
         db.session.commit()
         
         return jsonify({
-            'message': f'{created} default baies IT created',
+            'message': f'{created} baie(s) IT par défaut créée(s)',
             'created': created
         }), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de l'initialisation des baies IT : {str(e)}"}), 400
 
 # ========== ROUTES BAIES IT  ==========
 
@@ -174,12 +174,12 @@ def create_baie(local_id):
         db.session.commit()
         
         return jsonify({
-            'message': 'Baie IT created successfully',
+            'message': 'Baie IT ajoutée avec succès',
             'baie': baie_to_dict(new_baie)
         }), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de l'ajout de la baie IT : {str(e)}"}), 400
 
 # PUT update baie
 @locaux_it_bp.route('/baies/<int:id>', methods=['PUT'])
@@ -196,12 +196,12 @@ def update_baie(id):
         db.session.commit()
         
         return jsonify({
-            'message': 'Baie IT updated successfully',
+            'message': 'Baie IT modifiée avec succès',
             'baie': baie_to_dict(item)
         })
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de la modification de la baie IT : {str(e)}"}), 400
 
 # DELETE baie
 @locaux_it_bp.route('/baies/<int:id>', methods=['DELETE'])
@@ -211,18 +211,18 @@ def delete_baie(id):
     try:
         db.session.delete(item)
         db.session.commit()
-        return jsonify({'message': 'Baie IT deleted successfully'})
+        return jsonify({'message': 'Baie IT supprimée avec succès'})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de la suppression de la baie IT : {str(e)}"}), 400
 
 def local_to_dict(item):
     return {
         'id': item.id,
         'nom': item.nom,
         'localisation': item.localisation,
-        'date_creation': item.date_creation.isoformat(),
-        'date_modification': item.date_modification.isoformat()
+        'date_creation': item.date_creation.isoformat() if item.date_creation else None,
+        'date_modification': item.date_modification.isoformat() if item.date_modification else None
     }
 
 def local_to_dict_with_baies(item):
@@ -232,8 +232,8 @@ def local_to_dict_with_baies(item):
         'localisation': item.localisation,
         'baies': [baie_to_dict_with_materiels(b) for b in item.baies],
         'materiels': [materiel_to_dict(m) for m in MaterielIT.query.filter_by(local_it_id=item.id, baie_id=None).all()],
-        'date_creation': item.date_creation.isoformat(),
-        'date_modification': item.date_modification.isoformat()
+        'date_creation': item.date_creation.isoformat() if item.date_creation else None,
+        'date_modification': item.date_modification.isoformat() if item.date_modification else None
     }
 
 def baie_to_dict(item):
@@ -243,8 +243,8 @@ def baie_to_dict(item):
         'numero': item.numero,
         'local_it_id': item.local_it_id,
         'description': item.description,
-        'date_creation': item.date_creation.isoformat(),
-        'date_modification': item.date_modification.isoformat()
+        'date_creation': item.date_creation.isoformat() if item.date_creation else None,
+        'date_modification': item.date_modification.isoformat() if item.date_modification else None
     }
 
 def baie_to_dict_with_materiels(item):
@@ -255,8 +255,8 @@ def baie_to_dict_with_materiels(item):
         'local_it_id': item.local_it_id,
         'description': item.description,
         'materiels': [materiel_to_dict(m) for m in MaterielIT.query.filter_by(baie_id=item.id).all()],
-        'date_creation': item.date_creation.isoformat(),
-        'date_modification': item.date_modification.isoformat()
+        'date_creation': item.date_creation.isoformat() if item.date_creation else None,
+        'date_modification': item.date_modification.isoformat() if item.date_modification else None
     }
 
 def materiel_to_dict(item):
@@ -288,8 +288,8 @@ def materiel_to_dict(item):
         'description': item.description,
         'baie_id': item.baie_id,
         'local_it_id': item.local_it_id,
-        'date_creation': item.date_creation.isoformat(),
-        'date_modification': item.date_modification.isoformat()
+        'date_creation': item.date_creation.isoformat() if item.date_creation else None,
+        'date_modification': item.date_modification.isoformat() if item.date_modification else None
     }
 
 
@@ -302,6 +302,7 @@ def create_materiel():
         new_m = MaterielIT(
             type_materiel=data.get('type_materiel'),
             nom=data.get('nom'),
+            marque=data.get('marque') or data.get('manufacturer'),
             modele=data.get('modele'),
             version=data.get('version'),
             os_firmware=data.get('os_firmware'),
@@ -317,7 +318,7 @@ def create_materiel():
         return jsonify({'message': 'Matériel ajouté', 'materiel': materiel_to_dict(new_m)}), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de l'ajout du matériel : {str(e)}"}), 400
 
 
 @locaux_it_bp.route('/materiels/<int:id>', methods=['DELETE'])
@@ -329,7 +330,7 @@ def delete_materiel(id):
         return jsonify({'message': 'Matériel supprimé'})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de la suppression du matériel : {str(e)}"}), 400
 
 
 @locaux_it_bp.route('/materiels/<int:id>/transfer', methods=['PUT'])
@@ -367,7 +368,7 @@ def transfer_materiel(id):
         return jsonify({'message': 'Matériel transféré', 'materiel': materiel_to_dict(item)})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors du transfert du matériel : {str(e)}"}), 400
 
 
 # ========== ROUTES IMPORT/EXPORT MATERIELS IT  ==========
@@ -401,7 +402,7 @@ MATERIEL_IT_TEMPLATE_HEADERS = [
 def export_materiel_import_template():
     format_type = (request.args.get('format', 'xlsx') or 'xlsx').lower()
     if format_type not in ['csv', 'xlsx']:
-        return jsonify({'error': 'Invalid format. Use csv or xlsx'}), 400
+        return jsonify({'error': 'Format invalide. Utilisez csv ou xlsx'}), 400
 
     filename = get_export_filename('materiel_it_import_template', format_type)
     if format_type == 'xlsx':
@@ -414,11 +415,11 @@ def export_materiel_import_template():
 def import_materiel_it():
     try:
         if 'file' not in request.files:
-            return jsonify({'error': 'No file provided'}), 400
+            return jsonify({'error': 'Aucun fichier fourni'}), 400
 
         file = request.files['file']
         if file.filename == '':
-            return jsonify({'error': 'No file selected'}), 400
+            return jsonify({'error': 'Aucun fichier sélectionné'}), 400
 
         import pandas as pd
         filename = (file.filename or '').lower()
@@ -427,7 +428,7 @@ def import_materiel_it():
         elif filename.endswith('.csv'):
             df = pd.read_csv(file)
         else:
-            return jsonify({'error': 'File format not supported'}), 400
+            return jsonify({'error': 'Format de fichier non pris en charge'}), 400
 
         imported_count = 0
         errors = []
@@ -438,7 +439,7 @@ def import_materiel_it():
                 type_materiel = (row.get('Marque') or 'autre').strip()
                 
                 if not nom:
-                    errors.append(f'Row {index + 1}: Nomination is required')
+                    errors.append(f'Ligne {index + 1} : le champ Nomination est obligatoire')
                     continue
 
                 uc = (row.get('UC') or '').strip() or None
@@ -495,17 +496,17 @@ def import_materiel_it():
                 db.session.add(new_materiel)
                 imported_count += 1
             except Exception as e:
-                errors.append(f'Row {index + 1}: {str(e)}')
+                errors.append(f'Ligne {index + 1} : {str(e)}')
 
         db.session.commit()
         return jsonify({
-            'message': f'{imported_count} matériels imported successfully',
+            'message': f'{imported_count} matériel(s) importé(s) avec succès',
             'imported_count': imported_count,
             'errors': errors
         }), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de l'import des matériels IT : {str(e)}"}), 400
 
 
 # ========== ROUTES EXPORT  ==========
@@ -515,7 +516,7 @@ def import_materiel_it():
 def export_locaux_it():
     format_type = (request.args.get('format', 'csv') or 'csv').lower()
     if format_type not in ['csv', 'xlsx']:
-        return jsonify({'error': 'Invalid format '}), 400
+        return jsonify({'error': 'Format invalide'}), 400
 
     items = LocalIT.query.order_by(LocalIT.nom.asc()).all()
 
@@ -580,7 +581,7 @@ def export_locaux_it():
 def export_baies_it():
     format_type = (request.args.get('format', 'csv') or 'csv').lower()
     if format_type not in ['csv', 'xlsx']:
-        return jsonify({'error': 'Invalid format. Use csv or xlsx'}), 400
+        return jsonify({'error': 'Format invalide. Utilisez csv ou xlsx'}), 400
 
     items = BaieIT.query.order_by(BaieIT.local_it_id.asc(), BaieIT.nom.asc()).all()
 

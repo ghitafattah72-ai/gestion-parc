@@ -186,7 +186,7 @@ export default function Stock() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-3xl font-bold">Gestion du Stock</h2>
-            <p className="mt-2 text-slate-200 max-w-2xl">Visualisez et gérez l’inventaire central de vos équipements IT avec un accès rapide aux exports et à l’ajout.</p>
+            <p className="mt-2 text-slate-200 max-w-2xl">Visualisez et gérez l'inventaire central de vos équipements IT avec un accès rapide aux exports et à l’ajout.</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <label
@@ -305,9 +305,6 @@ export default function Stock() {
                 <option value="">Activité</option>
                 {activiteOptions.map((option) => (<option key={option} value={option}>{option}</option>))}
               </select>
-              <input type="number" placeholder="Quantité" value={formData.quantite}
-                onChange={(e) => setFormData({ ...formData, quantite: parseInt(e.target.value, 10) || 0 })}
-                className="p-2 border rounded" />
               <select value={formData.etat}
                 onChange={(e) => setFormData({ ...formData, etat: e.target.value })}
                 className="p-2 border rounded">
@@ -341,7 +338,6 @@ export default function Stock() {
               <th className="p-3 text-left">RAM</th>
               <th className="p-3 text-left">Disque Dur</th>
               <th className="p-3 text-left">Activité</th>
-              <th className="p-3 text-left">Quantité</th>
               <th className="p-3 text-left">État</th>
               <th className="p-3 text-left">Actions</th>
             </tr>
@@ -365,7 +361,6 @@ export default function Stock() {
                   <td className="p-3">{item.ram || '-'}</td>
                   <td className="p-3">{item.disque_dur || '-'}</td>
                   <td className="p-3">{item.activite || item.type_stock || '-'}</td>
-                  <td className="p-3">{item.quantite}</td>
                   <td className="p-3">{item.etat || '-'}</td>
                   <td className="p-3">
                     <RestrictedButton

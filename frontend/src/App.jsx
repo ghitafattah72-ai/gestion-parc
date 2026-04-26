@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
-import { authAPI } from './api';
+import { authAPI, utilisateursAPI } from './api';
 
 // Import pages
 import Dashboard from './pages/Dashboard';
@@ -20,6 +20,7 @@ const HUTCHINSON_LOGO_FALLBACK_URL = 'https://cdn.brandfetch.io/hutchinson.com/i
 
 function AppContent() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
@@ -27,9 +28,32 @@ function AppContent() {
     confirmPassword: '',
   });
   const [passwordLoading, setPasswordLoading] = useState(false);
+  const [visitorPassword, setVisitorPassword] = useState('');
+  const [visitorPasswordLoading, setVisitorPasswordLoading] = useState(false);
+  const [visitorUserId, setVisitorUserId] = useState(null);
+
+  useEffect(() => {
+    if (!showPasswordModal || user?.role !== 'admin') return;
+
+    let cancelled = false;
+    utilisateursAPI.getAll()
+      .then((res) => {
+        if (cancelled) return;
+        const visiteur = (res.data || []).find((item) => (item.nom || '').toLowerCase() === 'visiteur');
+        setVisitorUserId(visiteur?.id || null);
+      })
+      .catch(() => {
+        if (!cancelled) setVisitorUserId(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showPasswordModal, user?.role]);
 
   const resetPasswordForm = () => {
     setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    setVisitorPassword('');
     setShowPasswordModal(false);
   };
 
@@ -55,6 +79,31 @@ function AppContent() {
       alert(error?.response?.data?.message || error?.response?.data?.error || 'Erreur lors du changement du mot de passe');
     } finally {
       setPasswordLoading(false);
+    }
+  };
+
+  const handleVisitorPasswordReset = async (e) => {
+    e.preventDefault();
+
+    if (!visitorUserId) {
+      alert('Utilisateur visiteur introuvable');
+      return;
+    }
+
+    if (!visitorPassword || visitorPassword.trim().length < 8) {
+      alert('Le mot de passe visiteur doit contenir au moins 8 caractères');
+      return;
+    }
+
+    try {
+      setVisitorPasswordLoading(true);
+      await utilisateursAPI.resetPassword(visitorUserId, visitorPassword.trim());
+      alert('Mot de passe du visiteur modifié avec succès');
+      setVisitorPassword('');
+    } catch (error) {
+      alert(error?.response?.data?.message || error?.response?.data?.error || 'Erreur lors du changement du mot de passe visiteur');
+    } finally {
+      setVisitorPasswordLoading(false);
     }
   };
 
@@ -92,19 +141,27 @@ function AppContent() {
           </nav>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              type="button"
-              onClick={() => setShowPasswordModal(true)}
-              className="hidden text-right md:block"
-              title="Changer le mot de passe"
-            >
-              <p className="text-sm font-semibold text-slate-700">{user?.nom}</p>
-              <p className="text-xs text-slate-500">{user?.role === 'admin' ? 'Administrateur' : 'Consultation'}</p>
-            </button>
+            <div className="hidden text-right md:block">
+              {user?.role === 'admin' ? (
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordModal(true)}
+                  title="Gérer les mots de passe"
+                >
+                  <p className="text-sm font-semibold text-slate-700">{user?.nom}</p>
+                  <p className="text-xs text-slate-500">Administrateur</p>
+                </button>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold text-slate-700">{user?.nom}</p>
+                  <p className="text-xs text-slate-500">Consultation</p>
+                </>
+              )}
+            </div>
             <button
               onClick={() => {
                 logout();
-                window.location.href = '/';
+                navigate('/', { replace: true });
               }}
               className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_18px_rgba(15,23,42,0.25)] transition hover:-translate-y-0.5 hover:bg-slate-800"
             >
@@ -137,7 +194,7 @@ function AppContent() {
         </div>
       </main>
 
-      {showPasswordModal && (
+      {showPasswordModal && user?.role === 'admin' && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/35 px-4">
           <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
             <h3 className="text-xl font-bold text-slate-900">Changer le mot de passe</h3>
@@ -184,6 +241,31 @@ function AppContent() {
                 </button>
               </div>
             </form>
+
+            {user?.role === 'admin' && (
+              <form onSubmit={handleVisitorPasswordReset} className="mt-6 border-t border-slate-200 pt-5 space-y-4">
+                <div>
+                  <h4 className="text-base font-bold text-slate-900">Mot de passe du visiteur</h4>
+                  <p className="mt-1 text-sm text-slate-500">L'administrateur peut modifier directement le mot de passe du compte visiteur.</p>
+                </div>
+                <input
+                  type="password"
+                  placeholder="Nouveau mot de passe visiteur"
+                  value={visitorPassword}
+                  onChange={(e) => setVisitorPassword(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 outline-none focus:border-slate-400"
+                />
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-white"
+                    disabled={visitorPasswordLoading || !visitorUserId}
+                  >
+                    {visitorPasswordLoading ? 'Modification...' : 'Modifier visiteur'}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
@@ -202,7 +284,28 @@ function AppWithAuth() {
 }
 
 function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { user, loading } = useAuth();
+  const routeRestoredRef = useRef(false);
+
+  useEffect(() => {
+    // Remember current location so refresh/login can return to the same page.
+    const currentRoute = `${location.pathname}${location.search}${location.hash}`;
+    sessionStorage.setItem('gs_last_route', currentRoute);
+  }, [location.pathname, location.search, location.hash]);
+
+  useEffect(() => {
+    if (loading || !user || routeRestoredRef.current) return;
+
+    routeRestoredRef.current = true;
+    const savedRoute = sessionStorage.getItem('gs_last_route');
+    const currentRoute = `${location.pathname}${location.search}${location.hash}`;
+
+    if (savedRoute && savedRoute !== '/' && currentRoute === '/') {
+      navigate(savedRoute, { replace: true });
+    }
+  }, [loading, user, location.pathname, location.search, location.hash, navigate]);
 
   if (loading) {
     return (

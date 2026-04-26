@@ -37,7 +37,6 @@ def login():
         'user': {
             'id': user.id,
             'nom': user.nom,
-            'email': user.email,
             'role': user.role,
             'permission_export': user.permission_export,
             'permission_import': user.permission_import
@@ -78,7 +77,7 @@ def change_password():
         return jsonify({'message': 'Mot de passe modifié avec succès'}), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors du changement de mot de passe : {str(e)}"}), 400
 
 # Register endpoint (only accessible by admin)
 @auth_bp.route('/register', methods=['POST'])
@@ -95,24 +94,19 @@ def register():
 
     data = request.json
     nom = data.get('nom')
-    email = data.get('email')
     password = data.get('password')
     role = data.get('role', 'user')
 
-    if not nom or not email or not password:
-        return jsonify({'message': 'Tous les champs sont requis'}), 400
+    if not nom or not password:
+        return jsonify({'message': 'Nom d\'utilisateur et mot de passe sont requis'}), 400
 
     # Check if user already exists
     if Utilisateur.query.filter_by(nom=nom).first():
         return jsonify({'message': 'Cet utilisateur existe déjà'}), 400
 
-    if Utilisateur.query.filter_by(email=email).first():
-        return jsonify({'message': 'Cet email est déjà utilisé'}), 400
-
     try:
         new_user = Utilisateur(
             nom=nom,
-            email=email,
             password=generate_password_hash(password),
             role=role,
             date_creation=datetime.utcnow()
@@ -126,13 +120,12 @@ def register():
             'user': {
                 'id': new_user.id,
                 'nom': new_user.nom,
-                'email': new_user.email,
                 'role': new_user.role
             }
         }), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de la création de l'utilisateur : {str(e)}"}), 400
 
 # Get current user info
 @auth_bp.route('/me', methods=['GET'])
@@ -149,7 +142,6 @@ def get_current_user():
     return jsonify({
         'id': user.id,
         'nom': user.nom,
-        'email': user.email,
         'role': user.role,
         'permission_export': user.permission_export,
         'permission_import': user.permission_import

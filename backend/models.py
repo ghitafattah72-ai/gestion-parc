@@ -8,7 +8,6 @@ class Utilisateur(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     nom = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(100), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(50), default='user')  # admin, user, manager
     permission_export = db.Column(db.Boolean, default=False)

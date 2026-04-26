@@ -24,7 +24,6 @@ STOCK_IMPORT_TEMPLATE_HEADERS = [
     'RAM',
     'Disque Dur',
     'Activité',
-    'Quantité',
     'État',
 ]
 
@@ -117,10 +116,10 @@ def create_stock_item():
         )
         db.session.add(new_item)
         db.session.commit()
-        return jsonify({'message': 'Stock item created successfully', 'item': item_to_dict(new_item)}), 201
+        return jsonify({'message': 'Équipement ajouté au stock avec succès', 'item': item_to_dict(new_item)}), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de l'ajout au stock : {str(e)}"}), 400
 
 # PUT update stock item
 @stock_bp.route('/<int:id>', methods=['PUT'])
@@ -148,10 +147,10 @@ def update_stock_item(id):
         item.service = data.get('service') or None
         item.date_modification = datetime.utcnow()
         db.session.commit()
-        return jsonify({'message': 'Stock item updated successfully', 'item': item_to_dict(item)})
+        return jsonify({'message': 'Équipement du stock modifié avec succès', 'item': item_to_dict(item)})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de la modification du stock : {str(e)}"}), 400
 
 # DELETE stock item
 @stock_bp.route('/<int:id>', methods=['DELETE'])
@@ -161,10 +160,10 @@ def delete_stock_item(id):
     try:
         db.session.delete(item)
         db.session.commit()
-        return jsonify({'message': 'Stock item deleted successfully'})
+        return jsonify({'message': 'Équipement du stock supprimé avec succès'})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de la suppression du stock : {str(e)}"}), 400
 
 
 # IMPORT stock from Excel/CSV
@@ -173,7 +172,7 @@ def delete_stock_item(id):
 def export_stock_import_template():
     format_type = (request.args.get('format', 'xlsx') or 'xlsx').lower()
     if format_type not in ['csv', 'xlsx']:
-        return jsonify({'error': 'Invalid format. Use csv or xlsx'}), 400
+        return jsonify({'error': 'Format invalide. Utilisez csv ou xlsx'}), 400
 
     filename = get_export_filename('stock_import_template', format_type)
     if format_type == 'xlsx':
@@ -186,12 +185,12 @@ def export_stock_import_template():
 def import_stock():
     try:
         if 'file' not in request.files:
-            return jsonify({'error': 'No file provided'}), 400
+            return jsonify({'error': 'Aucun fichier fourni'}), 400
 
         file = request.files['file']
 
         if file.filename == '':
-            return jsonify({'error': 'No file selected'}), 400
+            return jsonify({'error': 'Aucun fichier sélectionné'}), 400
 
         filename = (file.filename or '').lower()
         if filename.endswith('.xlsx') or filename.endswith('.xls'):
@@ -199,7 +198,7 @@ def import_stock():
         elif filename.endswith('.csv'):
             df = pd.read_csv(file)
         else:
-            return jsonify({'error': 'File format not supported'}), 400
+            return jsonify({'error': 'Format de fichier non pris en charge'}), 400
 
         missing_headers = _validate_template_headers(df.columns, STOCK_IMPORT_TEMPLATE_HEADERS)
         if missing_headers:
@@ -227,7 +226,7 @@ def import_stock():
                     quantite = 0
 
                 if not nom_equipement or not type_equipement or not activite:
-                    errors.append(f'Row {index + 1}: Name, Type et Activité sont obligatoires')
+                    errors.append(f'Ligne {index + 1} : Name, Type et Activité sont obligatoires')
                     continue
 
                 numero_serie = _first_value(row, ['N° de Série', 'N° Série', 'Numero du serie'])
@@ -263,18 +262,18 @@ def import_stock():
 
                 imported_count += 1
             except Exception as e:
-                errors.append(f'Row {index + 1}: {str(e)}')
+                errors.append(f'Ligne {index + 1} : {str(e)}')
 
         db.session.commit()
 
         return jsonify({
-            'message': f'{imported_count} items imported successfully',
+            'message': f'{imported_count} équipement(s) importé(s) avec succès',
             'imported_count': imported_count,
             'errors': errors
         }), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de l'import du stock : {str(e)}"}), 400
 
 # GET stock statistics
 @stock_bp.route('/stats', methods=['GET'])

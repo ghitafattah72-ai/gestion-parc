@@ -5,15 +5,15 @@ import { RestrictedButton } from '../components/ProtectedRoute';
 import { handleExportFile } from '../utils/fileExport';
 
 const TYPES_BAIE = [
-  'sw-core', 'sw-management', 'sw-acces', 'sw-tor', 'sw-hcs',
-  'controleur wifi', 'firewallHCS', 'firewall', 'HCS',
-  'routeur', 'IPBX', 'serveur', 'serveur HCS', 'baie de STOCKAGE', 'NAS', 'autres',
+  'Sw-core', 'Sw-management', 'Sw-acces', 'Sw-tor', 'Sw-hcs',
+  'Controleur wifi', 'FirewallHCS', 'Firewall',
+  'Routeur', 'IPBX', 'Serveur', 'Serveur HCS', 'Baie de STOCKAGE', 'NAS', 'Autres',
 ];
 
-const TYPES_LOCAL = ['sw-Access', "point d'accès", 'autres'];
+const TYPES_LOCAL = ['Sw-Access', "Point d'accès", 'Autres'];
 
 const EMPTY_MATERIEL = {
-  type_materiel: '', nom: '', modele: '', version: '',
+  type_materiel: '', nom: '', marque: '', modele: '', version: '',
   os_firmware: '', numero_serie: '', stack_role: '', stack_ip: '', description: '',
 };
 
@@ -310,7 +310,7 @@ export default function LocalsIT() {
                     onChange={(e) => setMaterielForm({ ...materielForm, type_materiel: e.target.value })}
                     className="w-full p-3 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-violet-500" required>
                     <option value="">Sélectionner un type</option>
-                    {(materielModal.type === 'baie' ? TYPES_BAIE : TYPES_LOCAL).map(t => (
+                    {(materielModal.type === 'baie' ? TYPES_LOCAL : TYPES_BAIE).map(t => (
                       <option key={t} value={t}>{t}</option>
                     ))}
                   </select>
@@ -320,6 +320,12 @@ export default function LocalsIT() {
                   <input type="text" placeholder="Nom" value={materielForm.nom}
                     onChange={(e) => setMaterielForm({ ...materielForm, nom: e.target.value })}
                     className="w-full p-3 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-violet-500" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-slate-600">Manufacturer</label>
+                  <input type="text" placeholder="Manufacturer" value={materielForm.marque || ''}
+                    onChange={(e) => setMaterielForm({ ...materielForm, marque: e.target.value })}
+                    className="w-full p-3 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-violet-500" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1 text-slate-600">Modèle</label>
@@ -572,7 +578,7 @@ function MaterielTable({ materiels, onDelete, onTransfer, currentLocalId, curren
       <table className="w-full text-sm">
         <thead className="bg-slate-50 border-b border-slate-200">
           <tr>
-            {['Type', 'Nom', 'Modèle', 'Version', 'OS', 'N° Série', 'Stack Rôle', 'Stack IP', ''].map(h => (
+            {['Type', 'Nom', 'Manufacturer', 'Modèle', 'Version', 'OS', 'N° Série', 'Stack Rôle', 'Stack IP', ''].map(h => (
               <th key={h} className="px-3 py-2 text-left text-xs font-semibold text-slate-500 uppercase whitespace-nowrap">{h}</th>
             ))}
           </tr>
@@ -582,6 +588,7 @@ function MaterielTable({ materiels, onDelete, onTransfer, currentLocalId, curren
             <tr key={m.id} className="hover:bg-slate-50">
               <td className="px-3 py-2 font-medium text-violet-700 whitespace-nowrap">{m.type_materiel}</td>
               <td className="px-3 py-2 whitespace-nowrap">{m.nom}</td>
+              <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{m.marque || '—'}</td>
               <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{m.modele || '—'}</td>
               <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{m.version || '—'}</td>
               <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{m.os_firmware || '—'}</td>
@@ -592,9 +599,9 @@ function MaterielTable({ materiels, onDelete, onTransfer, currentLocalId, curren
                 <RestrictedButton
                   onClick={() => onTransfer(m, { currentLocalId, currentBaieId })}
                   requiredAction="edit"
-                  className="mr-3 text-amber-500 hover:text-amber-700"
+                  className="mr-3 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-200"
                 >
-                  <ArrowRightLeft size={14} />
+                  <ArrowRightLeft size={13} /> Transférer
                 </RestrictedButton>
                 <RestrictedButton
                   onClick={() => onDelete(m.id)}

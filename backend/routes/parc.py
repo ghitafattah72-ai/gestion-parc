@@ -22,7 +22,6 @@ PARC_IMPORT_TEMPLATE_HEADERS = [
     'Emplacement',
     'Activité',
     'Service',
-    'Quantité',
 ]
 
 PARC_EXPORT_HEADERS = [
@@ -134,7 +133,7 @@ def create_parc_item():
             'disque_dur': _payload_value(data, 'disque_dur'),
             'emplacement': _payload_value(data, 'emplacement'),
             'service': _payload_value(data, 'service'),
-            'esu': _payload_value(data, 'esu'),
+            'activite': _payload_value(data, 'activite') or _payload_value(data, 'esu'),
         }
 
         if not payload['name']:
@@ -161,19 +160,19 @@ def create_parc_item():
             disque_dur=payload['disque_dur'],
             emplacement=payload['emplacement'],
             service=payload['service'],
-            esu=payload['esu']
+            activite=payload['activite']
         )
         
         db.session.add(new_item)
         db.session.commit()
         
         return jsonify({
-            'message': 'Parc item created successfully',
+            'message': 'Équipement du parc ajouté avec succès',
             'item': parc_to_dict(new_item)
         }), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de l'ajout de l'équipement du parc : {str(e)}"}), 400
 
 # PUT update parc item
 @parc_bp.route('/<int:id>', methods=['PUT'])
@@ -210,18 +209,18 @@ def update_parc_item(id):
         item.disque_dur = _payload_value(data, 'disque_dur')
         item.emplacement = _payload_value(data, 'emplacement')
         item.service = _payload_value(data, 'service')
-        item.esu = _payload_value(data, 'esu')
+        item.activite = _payload_value(data, 'activite') or _payload_value(data, 'esu')
         item.date_modification = datetime.utcnow()
         
         db.session.commit()
         
         return jsonify({
-            'message': 'Parc item updated successfully',
+            'message': 'Équipement du parc modifié avec succès',
             'item': parc_to_dict(item)
         })
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de la modification de l'équipement du parc : {str(e)}"}), 400
 
 # DELETE parc item
 @parc_bp.route('/<int:id>', methods=['DELETE'])
@@ -231,10 +230,10 @@ def delete_parc_item(id):
     try:
         db.session.delete(item)
         db.session.commit()
-        return jsonify({'message': 'Parc item deleted successfully'})
+        return jsonify({'message': 'Équipement du parc supprimé avec succès'})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de la suppression de l'équipement du parc : {str(e)}"}), 400
 
 # IMPORT parc from Excel/CSV
 @parc_bp.route('/import-template', methods=['GET'])
@@ -242,7 +241,7 @@ def delete_parc_item(id):
 def export_parc_import_template():
     format_type = (request.args.get('format', 'xlsx') or 'xlsx').lower()
     if format_type not in ['csv', 'xlsx']:
-        return jsonify({'error': 'Invalid format. Use csv or xlsx'}), 400
+        return jsonify({'error': 'Format invalide. Utilisez csv ou xlsx'}), 400
 
     filename = get_export_filename('parc_import_template', format_type)
     if format_type == 'xlsx':
@@ -255,12 +254,12 @@ def export_parc_import_template():
 def import_parc():
     try:
         if 'file' not in request.files:
-            return jsonify({'error': 'No file provided'}), 400
+            return jsonify({'error': 'Aucun fichier fourni'}), 400
         
         file = request.files['file']
         
         if file.filename == '':
-            return jsonify({'error': 'No file selected'}), 400
+            return jsonify({'error': 'Aucun fichier sélectionné'}), 400
         
         # Read file
         if file.filename.endswith('.xlsx') or file.filename.endswith('.xls'):
@@ -268,7 +267,7 @@ def import_parc():
         elif file.filename.endswith('.csv'):
             df = pd.read_csv(file)
         else:
-            return jsonify({'error': 'File format not supported'}), 400
+            return jsonify({'error': 'Format de fichier non pris en charge'}), 400
 
         missing_headers = _validate_template_headers(df.columns, PARC_IMPORT_TEMPLATE_HEADERS)
         if missing_headers:
@@ -311,10 +310,10 @@ def import_parc():
                     payload['quantite'] = 0
 
                 if not payload['name']:
-                    errors.append(f'Row {index + 1}: Name is required')
+                    errors.append(f'Ligne {index + 1} : le champ Name est obligatoire')
                     continue
                 if not payload['type']:
-                    errors.append(f'Row {index + 1}: Type is required')
+                    errors.append(f'Ligne {index + 1} : le champ Type est obligatoire')
                     continue
                 
                 if existing:
@@ -332,7 +331,7 @@ def import_parc():
                     existing.disque_dur = payload['disque_dur'] or existing.disque_dur
                     existing.emplacement = payload['emplacement'] or existing.emplacement
                     existing.service = payload['service'] or existing.service
-                    existing.esu = payload['esu'] or existing.esu
+                    existing.activite = payload['activite'] or existing.activite
                     existing.date_modification = datetime.utcnow()
                 else:
                     # Create new
@@ -341,18 +340,18 @@ def import_parc():
                 
                 imported_count += 1
             except Exception as e:
-                errors.append(f'Row {index + 1}: {str(e)}')
+                errors.append(f'Ligne {index + 1} : {str(e)}')
         
         db.session.commit()
         
         return jsonify({
-            'message': f'{imported_count} items imported successfully',
+            'message': f'{imported_count} équipement(s) importé(s) avec succès',
             'imported_count': imported_count,
             'errors': errors
         }), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de l'import du parc : {str(e)}"}), 400
 
 
 # EXPORT parc to Excel/CSV
@@ -361,7 +360,7 @@ def import_parc():
 def export_parc():
     format_type = request.args.get('format', 'csv').lower()
     if format_type not in ['csv', 'xlsx']:
-        return jsonify({'error': 'Invalid format. Use csv or xlsx'}), 400
+        return jsonify({'error': 'Format invalide. Utilisez csv ou xlsx'}), 400
 
     items = Parc.query.all()
     rows = [
@@ -463,6 +462,6 @@ def parc_to_dict(item):
         'service': item.service,
         'activite': item.activite,
         'quantite': item.quantite,
-        'date_creation': item.date_creation.isoformat(),
-        'date_modification': item.date_modification.isoformat()
+        'date_creation': item.date_creation.isoformat() if item.date_creation else None,
+        'date_modification': item.date_modification.isoformat() if item.date_modification else None
     }

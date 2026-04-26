@@ -38,6 +38,7 @@ def create_app():
     # Create tables and default users
     with app.app_context():
         db.create_all()
+        ensure_utilisateur_schema()
         ensure_parc_version_column()
         ensure_stock_extended_columns()
         ensure_materiel_it_extended_columns()
@@ -54,7 +55,6 @@ def create_default_users():
         # Migrate legacy anass account to admin if admin is missing.
         if not admin and legacy_anass:
             legacy_anass.nom = 'admin'
-            legacy_anass.email = 'admin@hutchinson.fr'
             legacy_anass.role = 'admin'
             legacy_anass.permission_export = True
             legacy_anass.permission_import = True
@@ -64,7 +64,6 @@ def create_default_users():
         if not admin:
             admin = Utilisateur(
                 nom='admin',
-                email='admin@hutchinson.fr',
                 password=generate_password_hash('Admin@hutchinson'),
                 role='admin',
                 permission_export=True,
@@ -80,7 +79,6 @@ def create_default_users():
         # Keep admin privileges and migrate old defaults to new default password once.
         admin.role = 'admin'
         admin.nom = 'admin'
-        admin.email = 'admin@hutchinson.fr'
         admin.permission_export = True
         admin.permission_import = True
         if (not admin.password or ':' not in admin.password
@@ -88,12 +86,49 @@ def create_default_users():
                 or check_password_hash(admin.password, 'Anass@2026')):
             admin.password = generate_password_hash('Admin@hutchinson')
 
+        # Ensure a default visitor account exists for read-only access with export only.
+        visiteur = Utilisateur.query.filter_by(nom='visiteur').first()
+        if not visiteur:
+            visiteur = Utilisateur(
+                nom='visiteur',
+                password=generate_password_hash('visiteur@hutchinson'),
+                role='view_only',
+                permission_export=True,
+                permission_import=False,
+                date_creation=datetime.utcnow()
+            )
+            db.session.add(visiteur)
+        else:
+            visiteur.nom = 'visiteur'
+            visiteur.role = 'view_only'
+            visiteur.permission_export = True
+            visiteur.permission_import = False
+            if not visiteur.password or ':' not in visiteur.password:
+                visiteur.password = generate_password_hash('visiteur@hutchinson')
+
         print("✓ Admin user ready: admin / Admin@hutchinson")
+        print("✓ Visiteur user ready: visiteur / visiteur@hutchinson")
 
         db.session.commit()
     except Exception as e:
         print(f"Error creating default users: {e}")
         db.session.rollback()
+
+
+def ensure_utilisateur_schema():
+    try:
+        inspector = inspect(db.engine)
+        if 'utilisateurs' not in inspector.get_table_names():
+            return
+
+        columns = {column['name'] for column in inspector.get_columns('utilisateurs')}
+        if 'email' in columns:
+            db.session.execute(text('ALTER TABLE utilisateurs DROP COLUMN email'))
+            db.session.commit()
+            print('✓ Colonne utilisateurs.email supprimée')
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error ensuring utilisateurs schema: {e}")
 
 
 def ensure_parc_version_column():
@@ -185,7 +220,7 @@ def ensure_materiel_it_extended_columns():
     except Exception as e:
         db.session.rollback()
         print(f"Error ensuring materiel_it extended columns: {e}")
-
+                  
 if __name__ == '__main__':
     app = create_app()
     app.run(debug=True, host='0.0.0.0', port=5000)

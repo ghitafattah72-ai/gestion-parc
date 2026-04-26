@@ -62,12 +62,15 @@ def create_utilisateur():
     try:
         # Hash password if provided
         password = data.get('password')
-        if not password:
-            return jsonify({'message': 'Le mot de passe est requis'}), 400
+        nom = (data.get('nom') or '').strip()
+        if not nom or not password:
+            return jsonify({'message': 'Nom d\'utilisateur et mot de passe sont requis'}), 400
+
+        if Utilisateur.query.filter_by(nom=nom).first():
+            return jsonify({'message': 'Cet utilisateur existe déjà'}), 400
 
         new_user = Utilisateur(
-            nom=data.get('nom'),
-            email=data.get('email'),
+            nom=nom,
             password=generate_password_hash(password),
             role=data.get('role', 'user'),
             permission_export=data.get('permission_export', False),
@@ -84,7 +87,7 @@ def create_utilisateur():
         }), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de la création de l'utilisateur : {str(e)}"}), 400
 
 # PUT update user (admin only)
 @utilisateurs_bp.route('/<int:id>', methods=['PUT'])
@@ -103,9 +106,7 @@ def update_utilisateur(id):
     
     try:
         if 'nom' in data:
-            item.nom = data['nom']
-        if 'email' in data:
-            item.email = data['email']
+            item.nom = (data['nom'] or '').strip()
         if 'password' in data and data['password']:
             item.password = generate_password_hash(data['password'])
         if 'role' in data:
@@ -119,7 +120,7 @@ def update_utilisateur(id):
         })
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de la mise à jour de l'utilisateur : {str(e)}"}), 400
 
 # DELETE user (admin only)
 @utilisateurs_bp.route('/<int:id>', methods=['DELETE'])
@@ -145,7 +146,7 @@ def delete_utilisateur(id):
         return jsonify({'message': 'Utilisateur supprimé'})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de la suppression de l'utilisateur : {str(e)}"}), 400
 
 # PUT update user permissions
 @utilisateurs_bp.route('/<int:id>/permissions', methods=['PUT'])
@@ -174,7 +175,37 @@ def update_permissions(id):
         })
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de la mise à jour des permissions : {str(e)}"}), 400
+
+
+@utilisateurs_bp.route('/<int:id>/reset-password', methods=['PUT'])
+@jwt_required()
+def reset_utilisateur_password(id):
+    current_user_id = _get_current_user_id()
+    if current_user_id is None:
+        return jsonify({'message': 'Token invalide'}), 401
+
+    current_user = Utilisateur.query.get(current_user_id)
+    if not current_user or current_user.role != 'admin':
+        return jsonify({'message': 'Accès refusé'}), 403
+
+    item = Utilisateur.query.get_or_404(id)
+    data = request.json or {}
+    new_password = (data.get('new_password') or '').strip()
+
+    if not new_password:
+        return jsonify({'message': 'Nouveau mot de passe requis'}), 400
+
+    if len(new_password) < 8:
+        return jsonify({'message': 'Le nouveau mot de passe doit contenir au moins 8 caractères'}), 400
+
+    try:
+        item.password = generate_password_hash(new_password)
+        db.session.commit()
+        return jsonify({'message': f"Mot de passe de {item.nom} modifié avec succès"}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f"Erreur lors de la réinitialisation du mot de passe : {str(e)}"}), 400
 
 def user_to_dict(item):
     return {

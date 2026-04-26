@@ -128,14 +128,85 @@ def update_mouvement(id):
     data = request.json or {}
 
     try:
-        new_activite = (data.get('activite') or '').strip()
-        new_description = (data.get('description') or '').strip()
+        updated_type_mouvement = item.type_mouvement
 
-        if item.type_mouvement == 'sortie' and not new_activite:
+        if 'type_mouvement' in data:
+            normalized = _normalize_mouvement_type(data.get('type_mouvement'))
+            if not normalized:
+                return jsonify({'error': 'Type mouvement invalide. Utiliser Entrée ou Sortie'}), 400
+            updated_type_mouvement = normalized
+            item.type_mouvement = normalized
+
+        if 'nom_equipement' in data:
+            item.nom_equipement = (data.get('nom_equipement') or '').strip()
+
+        if 'type_equipement' in data:
+            item.type_equipement = (data.get('type_equipement') or '').strip()
+
+        if 'quantite' in data:
+            quantite = _to_positive_int(data.get('quantite'))
+            if not quantite:
+                return jsonify({'error': 'Quantité invalide'}), 400
+            item.quantite = quantite
+
+        if 'type_stock' in data:
+            item.type_stock = (data.get('type_stock') or '').strip()
+
+        if 'source_entree' in data:
+            item.local_it_destination = (data.get('source_entree') or '').strip() or None
+
+        if 'local_it_destination' in data:
+            item.local_it_destination = (data.get('local_it_destination') or '').strip() or None
+
+        if 'baie_destination' in data:
+            item.baie_destination = (data.get('baie_destination') or '').strip() or None
+
+        if 'model_equipement' in data:
+            item.stockage = (data.get('model_equipement') or '').strip() or None
+
+        if 'ram' in data:
+            item.ram = (data.get('ram') or '').strip() or None
+
+        if 'processeur' in data:
+            item.processeur = (data.get('processeur') or '').strip() or None
+
+        if 'numero_serie' in data:
+            item.numero_serie = (data.get('numero_serie') or '').strip() or None
+
+        if 'activite' in data:
+            new_activite = (data.get('activite') or '').strip()
+            item.activite = new_activite or None
+
+        if 'systeme' in data:
+            item.systeme = (data.get('systeme') or '').strip() or None
+
+        if 'accessoires' in data:
+            item.accessoires = (data.get('accessoires') or '').strip() or None
+
+        if 'description' in data:
+            new_description = (data.get('description') or '').strip()
+            item.description = new_description or None
+
+        if 'date_affectation' in data:
+            date_affectation = data.get('date_affectation')
+            try:
+                parsed_date = _parse_affectation_date(date_affectation)
+            except ValueError:
+                return jsonify({'error': 'Date affectation invalide (format YYYY-MM-DD)'}), 400
+            item.date_mouvement = parsed_date or item.date_mouvement
+
+        if 'date_mouvement' in data:
+            date_mouvement_raw = data.get('date_mouvement')
+            try:
+                item.date_mouvement = datetime.fromisoformat(date_mouvement_raw)
+            except (TypeError, ValueError):
+                return jsonify({'error': 'Date mouvement invalide'}), 400
+
+        if not item.nom_equipement or not item.type_equipement or not item.type_stock:
+            return jsonify({'error': 'Nom, type équipement et type stock sont obligatoires'}), 400
+
+        if updated_type_mouvement == 'sortie' and not (item.activite or '').strip():
             return jsonify({'error': 'Activité obligatoire pour une sortie'}), 400
-
-        item.activite = new_activite or None
-        item.description = new_description or None
 
         db.session.commit()
         return jsonify({
@@ -144,7 +215,7 @@ def update_mouvement(id):
         })
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de la modification du mouvement : {str(e)}"}), 400
 
 
 @mouvements_bp.route('/sources/stock', methods=['GET'])
@@ -271,7 +342,7 @@ def create_mouvement():
         parc_item_id = _to_int(data.get('parc_item_id'))
         sortie_mode = (data.get('sortie_mode') or 'vers_parc').strip().lower()
 
-        if not quantite:
+        if not quantite and not (type_mouvement == 'sortie' and sortie_mode == 'dechet'):
             return jsonify({'error': 'Quantité invalide'}), 400
 
         source_entree = None
@@ -344,6 +415,10 @@ def create_mouvement():
 
             if not stock_item:
                 return jsonify({'error': 'Aucun stock trouvé pour cette sortie'}), 400
+
+            if sortie_mode == 'dechet':
+                quantite = stock_item.quantite
+
             if stock_item.quantite < quantite:
                 return jsonify({'error': 'Quantité insuffisante dans le stock'}), 400
 
@@ -473,12 +548,12 @@ def create_mouvement():
         db.session.commit()
 
         return jsonify({
-            'message': 'Movement created successfully',
+            'message': 'Mouvement créé avec succès',
             'mouvement': mouvement_to_dict(new_mouvement),
         }), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de la création du mouvement : {str(e)}"}), 400
 
 # DELETE movement
 @mouvements_bp.route('/<int:id>', methods=['DELETE'])
@@ -517,10 +592,10 @@ def delete_mouvement(id):
 
         db.session.delete(item)
         db.session.commit()
-        return jsonify({'message': 'Movement deleted successfully'})
+        return jsonify({'message': 'Mouvement supprimé avec succès'})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de la suppression du mouvement : {str(e)}"}), 400
 
 
 @mouvements_bp.route('/historique', methods=['GET'])
@@ -627,7 +702,7 @@ def delete_historique_mouvement(id):
         return jsonify({'message': 'Historique supprimé définitivement'})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': f"Erreur lors de la suppression définitive de l'historique : {str(e)}"}), 400
 
 # GET movement statistics
 @mouvements_bp.route('/stats', methods=['GET'])
@@ -653,7 +728,16 @@ def get_stats():
 @check_permission('export')
 def export_mouvements():
     format_type = request.args.get('format', 'csv')
-    items = Mouvement.query.order_by(Mouvement.date_mouvement.desc()).all()
+    export_scope = (request.args.get('scope') or '').strip().lower()
+
+    query = Mouvement.query
+    if export_scope == 'dechets':
+        query = query.filter(
+            Mouvement.type_mouvement == 'sortie',
+            db.func.lower(Mouvement.local_it_destination) == 'dechet',
+        )
+
+    items = query.order_by(Mouvement.date_mouvement.desc()).all()
     
     # Prepare headers
     headers = [
@@ -678,7 +762,8 @@ def export_mouvements():
     ] for item in items]
     
     # Generate filename
-    filename = get_export_filename('mouvements', format_type)
+    filename_base = 'dechets' if export_scope == 'dechets' else 'mouvements'
+    filename = get_export_filename(filename_base, format_type)
     
     # Export to requested format
     if format_type == 'xlsx':

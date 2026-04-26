@@ -23,7 +23,7 @@ const PARC_TYPES = [
   'cable',
   'autre'
 ];
-const DETAILED_TYPES = ['pc portable', 'pc fixe'];
+const DETAILED_TYPES = ['pc portable', 'pc fixe', 'ipo'];
 const ACTIVITE_OPTIONS = ['FSS', 'IMS', 'C2S', 'Commun'];
 
 const getEmptyFormData = () => ({
@@ -42,7 +42,6 @@ const getEmptyFormData = () => ({
   emplacement: '',
   service: '',
   activite: '',
-  quantite: 0,
 });
 
 export default function Parc() {
@@ -86,7 +85,10 @@ export default function Parc() {
   const handleSaveItem = async (e) => {
     e.preventDefault();
 
-    const payload = { ...formData };
+    const payload = {
+      ...formData,
+      quantite: 1,
+    };
 
     try {
       if (editingId) {
@@ -435,27 +437,23 @@ export default function Parc() {
                 {formData.activite && !ACTIVITE_OPTIONS.includes(formData.activite) && (
                   <option value={formData.activite}>{formData.activite}</option>
                 )}
-                            <input
-                              type="number"
-                              placeholder="Quantité"
-                              value={formData.quantite || 0}
-                              onChange={(e) => setFormData({ ...formData, quantite: parseInt(e.target.value) || 0 })}
-                              className="p-2 border rounded"
-                            />
               </select>
               {isDetailedType && (
                 <>
-                  <select
+                  <input
+                    type="text"
+                    placeholder="Operating System - Name"
                     value={formData.os_name}
-                    onChange={(e) => setFormData({ ...formData, os_name: e.target.value, os_version: '' })}
+                    onChange={(e) => setFormData({ ...formData, os_name: e.target.value })}
                     className="p-2 border rounded"
-                  >
-                    <option value="">Système d'exploitation</option>
-                    <option value="Windows 11 Professional">Windows 11 Professional</option>
-                    <option value="Windows 10 Professional">Windows 10 Professional</option>
-                    <option value="Windows 10 Entreprise">Windows 10 Entreprise</option>
-                    <option value="Windows 11 Entreprise">Windows 11 Entreprise</option>
-                  </select>
+                  />
+                  <input
+                    type="text"
+                    placeholder="Operating System - Version"
+                    value={formData.os_version}
+                    onChange={(e) => setFormData({ ...formData, os_version: e.target.value })}
+                    className="p-2 border rounded"
+                  />
                   <input
                     type="text"
                     placeholder="Processeur"
@@ -509,15 +507,14 @@ export default function Parc() {
               <th className="p-3 text-left">Emplacement</th>
               <th className="p-3 text-left">Activité</th>
               <th className="p-3 text-left">Service</th>
-              <th className="p-3 text-left">Quantité</th>
               <th className="p-3 text-left">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="16" className="p-3 text-center">Chargement...</td></tr>
+              <tr><td colSpan="15" className="p-3 text-center">Chargement...</td></tr>
             ) : filteredItems.length === 0 ? (
-              <tr><td colSpan="16" className="p-3 text-center">Aucun équipement</td></tr>
+              <tr><td colSpan="15" className="p-3 text-center">Aucun équipement</td></tr>
             ) : (
               filteredItems.map(item => (
                 <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
@@ -535,7 +532,6 @@ export default function Parc() {
                   <td className="p-3">{item.emplacement || '-'}</td>
                   <td className="p-3">{item.activite || '-'}</td>
                   <td className="p-3">{item.service || '-'}</td>
-                  <td className="p-3">{item.quantite || 0}</td>
                   <td className="p-3 flex gap-2">
                     <RestrictedButton
                       onClick={() => handleEditItem(item)}

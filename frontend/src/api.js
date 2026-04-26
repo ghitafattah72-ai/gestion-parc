@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:5000/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -59,8 +59,10 @@ export const mouvementsAPI = {
   create: (data) => api.post('/mouvements/', data),
   delete: (id) => api.delete(`/mouvements/${id}`),
   getStats: () => api.get('/mouvements/stats'),
-  export: (format = 'csv') =>
-    api.get('/mouvements/export', { params: { format }, responseType: 'blob' }),
+  export: (format = 'csv', scope = null) =>
+    api.get('/mouvements/export', { params: { format, scope }, responseType: 'blob' }),
+  exportDechets: (format = 'csv') =>
+    api.get('/mouvements/export', { params: { format, scope: 'dechets' }, responseType: 'blob' }),
 };
 
 // Parc API
@@ -126,6 +128,7 @@ export const utilisateursAPI = {
   getAll: () => api.get('/utilisateurs/'),
   getById: (id) => api.get(`/utilisateurs/${id}`),
   create: (data) => api.post('/utilisateurs/', data),
+  resetPassword: (id, new_password) => api.put(`/utilisateurs/${id}/reset-password`, { new_password }),
   updatePermissions: (id, data) => api.put(`/utilisateurs/${id}/permissions`, data),
   delete: (id) => api.delete(`/utilisateurs/${id}`),
 };
