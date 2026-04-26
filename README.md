@@ -1,28 +1,5 @@
 Application web de gestion du parc informatique, du stock, des mouvements, des dechets et des locaux IT.
 
-## Architecture
-
-### Backend
-- **Framework**: Flask (Python)
-- **Base de donnees**: SQLite par defaut, MySQL en option
-- **API**: RESTful avec Flask-CORS
-- **Authentification**: JWT avec Flask-JWT-Extended
-- **ORM**: SQLAlchemy
-
-### Frontend
-- **Framework**: React 18
-- **CSS**: Tailwind CSS
-- **HTTP Client**: Axios
-- **Routing**: React Router v6
-- **Icons**: Lucide React
-- **Charts**: Recharts
-
-## Langages de Programmation
-
-- **Python**: logique backend, API Flask, securite JWT et acces base de donnees
-- **JavaScript**: frontend React, appels API Axios, routage et interactions UI
-- **SQL**: modelisation et manipulation des donnees (SQLite par defaut, MySQL en option)
-- **HTML/CSS**: structure et presentation de l'interface utilisateur (avec Tailwind CSS)
 
 ## Structure du Projet
 
